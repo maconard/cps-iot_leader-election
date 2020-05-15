@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Simple script that makes it easier to use desvirt with RIOT
+# Author: Michael Conard
+
+COMMAND="$1"
+TOPO="$2"
+
+if [ -z "$COMMAND" ]
+then
+    echo "Usage: riot <command> <topology_name>"
+    exit 1
+fi
+
+if [ "$COMMAND" = "list" ]
+then
+    make desvirt-list
+    exit 0
+fi
+
+if [ -z "$TOPO" ]
+then
+    echo "Usage: riot <command> <topology_name>"
+    exit 1
+fi
+
+if [ "$COMMAND" = "define" ]
+then
+    make desvirt-define TOPO="$TOPO"
+fi
+
+if [ "$COMMAND" = "undefine" ]
+then
+    make desvirt-undefine TOPO="$TOPO"
+fi
+
+if [ "$COMMAND" = "stop" ]
+then
+    make desvirt-stop TOPO="$TOPO"
+fi
+
+if [ "$COMMAND" = "start" ]
+then
+    make desvirt-start TOPO="$TOPO"
+fi
+
