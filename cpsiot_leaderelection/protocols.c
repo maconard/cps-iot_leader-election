@@ -24,12 +24,12 @@
 #define IPV6_ADDRESS_LEN        (46)
 #define MAX_NEIGHBORS           (20)
 
-#define DEBUG	(0)
+#define DEBUG    (0)
 
 // Leader Election values
-#define K 	(5)
-#define T1	(5*1000000)
-#define T2	(3*1000000)
+#define K     (5)
+#define T1    (5*1000000)
+#define T2    (3*1000000)
 
 // External functions defs
 extern int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking);
@@ -104,19 +104,19 @@ void msgAllNeighbors(uint32_t min, char *leader, char *me) {
     strcat(msg,me);
     ipc_msg_send(msg, udpServerPID, true);
     if (DEBUG == 1) printf("LE: sent out new minimum info, %s and %s\n", neighborM, leader);
-	//xtimer_usleep(50000); // wait 0.05 seconds
+    //xtimer_usleep(50000); // wait 0.05 seconds
 }
 
 // Purpose: find the index of a semicolon in a string for data packing
 //
 // ipv6 char*, string to check for the semicolon in
 int indexOfSemi(char *ipv6) {
-	for (uint32_t i = 0; i < strlen(ipv6); i++) {
-		if (ipv6[i]  == ';') {
-			return i+1; // start of second id
-		}
-	}
-	return -1;
+    for (uint32_t i = 0; i < strlen(ipv6); i++) {
+        if (ipv6[i]  == ';') {
+            return i+1; // start of second id
+        }
+    }
+    return -1;
 }
 
 // Purpose: use ipv6 addresses to break ties 
@@ -125,17 +125,17 @@ int indexOfSemi(char *ipv6) {
 // ipv6_b char*, the second ipv6 address
 // return -1 if a<b, 1 if a>b, 0 if a==b
 int minIPv6(char *ipv6_a, char *ipv6_b) {
-	uint32_t minLength = strlen(ipv6_a);
-	if (strlen(ipv6_b) < minLength) minLength = strlen(ipv6_b);
-	
-	for (uint32_t i = 0; i < minLength; i++) {
-		if (ipv6_a[i] < ipv6_b[i]) {
-			return -1;
-		} else if (ipv6_b[i] < ipv6_a[i]) {
-			return 1;
-		}
-	}
-	return 0;
+    uint32_t minLength = strlen(ipv6_a);
+    if (strlen(ipv6_b) < minLength) minLength = strlen(ipv6_b);
+    
+    for (uint32_t i = 0; i < minLength; i++) {
+        if (ipv6_a[i] < ipv6_b[i]) {
+            return -1;
+        } else if (ipv6_b[i] < ipv6_a[i]) {
+            return 1;
+        }
+    }
+    return 0;
 }
 
 // ************************************
@@ -215,8 +215,8 @@ void *_leader_election(void *argv) {
     uint32_t m = (random_uint32() % 254)+1; // my leader election value, range 1 to 255
     uint32_t min = m;                       // the min of my neighborhood 
     uint32_t tempMin = 257;
-    char leader[IPV6_ADDRESS_LEN] = "unknown";	// the "leader so far"
-    char tempLeader[IPV6_ADDRESS_LEN];	// temp leader for a round of communication
+    char leader[IPV6_ADDRESS_LEN] = "unknown";    // the "leader so far"
+    char tempLeader[IPV6_ADDRESS_LEN];    // temp leader for a round of communication
     uint64_t t1 = T1;
     uint64_t t2 = T2;
     uint64_t lastT1 = 0;
@@ -236,7 +236,7 @@ void *_leader_election(void *argv) {
                 //(void) puts("LE: in type==0 block");
                 udpServerPID = *(kernel_pid_t*)msg_p_in.content.ptr;
                 if (DEBUG == 1) 
-					printf("LE: Protocol thread recorded %" PRIkernel_pid " as the UDP server thread's PID\n", udpServerPID);
+                    printf("LE: Protocol thread recorded %" PRIkernel_pid " as the UDP server thread's PID\n", udpServerPID);
                 continue;
 
             } else if (msg_p_in.type == 1 && strlen(myIPv6) == 0) { // process my IPv6
@@ -251,9 +251,9 @@ void *_leader_election(void *argv) {
             } else if (msg_p_in.type == 2) { // report about the leader
 
                 if (DEBUG == 1) 
-					printf("LE: in type==2 block, content=%s\n", (char*)msg_p_in.content.ptr);
+                    printf("LE: in type==2 block, content=%s\n", (char*)msg_p_in.content.ptr);
                 if (DEBUG == 1) 
-					printf("LE: replying with msg=%s, size=%u\n", leader, strlen(leader));
+                    printf("LE: replying with msg=%s, size=%u\n", leader, strlen(leader));
                 ipc_msg_reply(leader, msg_p_in);
                 continue;
 
@@ -262,7 +262,7 @@ void *_leader_election(void *argv) {
                 //printf("LE: in type>2 block, type=%u\n", (uint16_t)msg_p_in.type);
                 strncpy(msg_content, (char*)msg_p_in.content.ptr, (uint16_t)msg_p_in.type+1);
                 if (DEBUG == 1) 
-					printf("LE: Protocol thread received IPC message: %s from PID=%" PRIkernel_pid " with type=%d\n", msg_content, msg_p_in.sender_pid, msg_p_in.type);
+                    printf("LE: Protocol thread received IPC message: %s from PID=%" PRIkernel_pid " with type=%d\n", msg_content, msg_p_in.sender_pid, msg_p_in.type);
 
             } else {
 
@@ -330,7 +330,7 @@ void *_leader_election(void *argv) {
                                 printf("%2d: %s\n", c, neighbors[i]);
                                 c += 1;
                             }
-							delayLE = 0;
+                            delayLE = 0;
                         }
                     }
                     break;
@@ -340,18 +340,18 @@ void *_leader_election(void *argv) {
             }
         }   
 
-		if(strlen(myIPv6) == 0) continue;
+        if(strlen(myIPv6) == 0) continue;
 
         // react to input, allowed after IPv6 init
         if (res == 1) {
             if (numNeighbors > 0 && strncmp(msg_content, "le_ack:", 7) == 0) {
                 // a neighbor has responded
-				// le_ack:mmm:ipv6_owner;ipv6_sender
+                // le_ack:mmm:ipv6_owner;ipv6_sender
                 substr(msg_content, 7, 3, neighborM); // obtain m value
-				int j = indexOfSemi(msg_content);
+                int j = indexOfSemi(msg_content);
                 substr(msg_content, 11, j-11-1, ipv6); // obtain ID
-				//if (DEBUG == 1) printf("LE: found ; at %d\n", j);
-				substr(msg_content, j+1, IPV6_ADDRESS_LEN, ipv6_2); // obtain neighbor ID
+                //if (DEBUG == 1) printf("LE: found ; at %d\n", j);
+                substr(msg_content, j+1, IPV6_ADDRESS_LEN, ipv6_2); // obtain neighbor ID
                 int i = getNeighborIndex(neighbors, ipv6_2);
                 if (atoi(neighborM) <= 0) continue;
                 printf("LE: new m value %d from %s, id=%s\n", atoi(neighborM), ipv6_2, ipv6);
@@ -365,21 +365,21 @@ void *_leader_election(void *argv) {
                 lastLE = xtimer_now_usec64();
             } else if (numNeighbors > 0 && strncmp(msg_content, "le_m?:", 6) == 0) {
                 // someone wants my m
-                //msgAllNeighbors(min, leader, myIPv6);				
-				char msg[MAX_IPC_MESSAGE_SIZE] = "le_ack:";               
-				if(min < 10) {
-					sprintf(neighborM, "00%d",min);
-				} else if (min < 100) {
-					sprintf(neighborM, "0%d",min);
-				} else {
-					sprintf(neighborM, "%d",min);
-				}
-				strcat(msg,neighborM);
-				strcat(msg,":");
-				strcat(msg,leader);
-				strcat(msg,";");
-				strcat(msg,myIPv6);
-				ipc_msg_send(msg, udpServerPID, false);
+                //msgAllNeighbors(min, leader, myIPv6);                
+                char msg[MAX_IPC_MESSAGE_SIZE] = "le_ack:";               
+                if(min < 10) {
+                    sprintf(neighborM, "00%d",min);
+                } else if (min < 100) {
+                    sprintf(neighborM, "0%d",min);
+                } else {
+                    sprintf(neighborM, "%d",min);
+                }
+                strcat(msg,neighborM);
+                strcat(msg,":");
+                strcat(msg,leader);
+                strcat(msg,";");
+                strcat(msg,myIPv6);
+                ipc_msg_send(msg, udpServerPID, false);
             }
         }
 
@@ -393,106 +393,106 @@ void *_leader_election(void *argv) {
                 runningLE = true;
                 allowLE = false;
                 startTimeLE = (uint64_t)(xtimer_now_usec64()/1000000);
-				counter = K;
-				stateLE = 0;
+                counter = K;
+                stateLE = 0;
             }
         } else if (runningLE) {
             // perform leader election
             switch(stateLE) {   // check what state of leader election we are in
                 case 0 : // case 0: send out multicast ping
-					if (DEBUG == 1) 
-						printf("LE: case 0, leader=%s, min=%d\n", leader, min);
+                    if (DEBUG == 1) 
+                        printf("LE: case 0, leader=%s, min=%d\n", leader, min);
                     ipc_msg_send(initLE, udpServerPID, false);
                     stateLE = 1;
                     countedMs = 0;
-					lastT2 = xtimer_now_usec64();
+                    lastT2 = xtimer_now_usec64();
                     break;
                 case 1 : // case 1: line 4 of psuedocode
                     if (countedMs == numNeighbors || lastT2 < xtimer_now_usec64() - t2) {
-						if (DEBUG == 1) 
-							printf("LE: case 1, leader=%s, min=%d, heardFrom=%d\n", leader, min, countedMs);
+                        if (DEBUG == 1) 
+                            printf("LE: case 1, leader=%s, min=%d, heardFrom=%d\n", leader, min, countedMs);
                         stateLE = 2;
                         lastT2 = xtimer_now_usec64();
-						tempMin = 257;
-						countedMs = 0;
-						for (int i = 0; i < MAX_NEIGHBORS; i++) {
-							neighborsVal[i] = 0;
-						}
+                        tempMin = 257;
+                        countedMs = 0;
+                        for (int i = 0; i < MAX_NEIGHBORS; i++) {
+                            neighborsVal[i] = 0;
+                        }
                     }
                     break;
-				case 2 : // case 2: line 5 of pseudocode
-					if (lastT1 < xtimer_now_usec64() - t1) {
-						if (DEBUG == 1) 
-							printf("LE: case 2, leader=%s, min=%d, counter=%d\n", leader, min, counter);
-						stateLE = 3;
-		                lastT2 = xtimer_now_usec64();
-						lastT1 = xtimer_now_usec64();
-					}
-					break;
-				case 3 : // case 3: lines 5a-f of pseudocode, some contained in response above
-					if (countedMs == numNeighbors || lastT2 < xtimer_now_usec64() - t2) {
-						printf("LE: case 3, leader=%s, min=%d, heardFrom=%d, counter=%d\n", leader, min, countedMs, counter);
-						
-						if (tempMin < min) {
-							printf("LE: case 3, tempMin=%d < min=%d\n", tempMin, min);
-							min = tempMin;
-							strcpy(leader, tempLeader);
-							counter = K;
-						} else if (tempMin == min && counter > 0) {
-							printf("LE: case 3, tempMin=%d == min=%d\n", tempMin, min);
-							counter = counter - 1;
-							int tie = minIPv6(leader, tempLeader);
-							if (tie == 1) {
-								// new leader wins tie
-								strcpy(leader, tempLeader);
-								printf("LE: tempLeader wins tie\n");
-							} else {
-								// else the old leader won the tie, so no change
-								printf("LE: existing leader wins tie\n");
-							}
-						} else if (counter == 0) {
-							printf("LE case 3, counter == 0 so quit\n");
-							stateLE = 5;
-							break;
-						}
+                case 2 : // case 2: line 5 of pseudocode
+                    if (lastT1 < xtimer_now_usec64() - t1) {
+                        if (DEBUG == 1) 
+                            printf("LE: case 2, leader=%s, min=%d, counter=%d\n", leader, min, counter);
+                        stateLE = 3;
+                        lastT2 = xtimer_now_usec64();
+                        lastT1 = xtimer_now_usec64();
+                    }
+                    break;
+                case 3 : // case 3: lines 5a-f of pseudocode, some contained in response above
+                    if (countedMs == numNeighbors || lastT2 < xtimer_now_usec64() - t2) {
+                        printf("LE: case 3, leader=%s, min=%d, heardFrom=%d, counter=%d\n", leader, min, countedMs, counter);
+                        
+                        if (tempMin < min) {
+                            printf("LE: case 3, tempMin=%d < min=%d\n", tempMin, min);
+                            min = tempMin;
+                            strcpy(leader, tempLeader);
+                            counter = K;
+                        } else if (tempMin == min && counter > 0) {
+                            printf("LE: case 3, tempMin=%d == min=%d\n", tempMin, min);
+                            counter = counter - 1;
+                            int tie = minIPv6(leader, tempLeader);
+                            if (tie == 1) {
+                                // new leader wins tie
+                                strcpy(leader, tempLeader);
+                                printf("LE: tempLeader wins tie\n");
+                            } else {
+                                // else the old leader won the tie, so no change
+                                printf("LE: existing leader wins tie\n");
+                            }
+                        } else if (counter == 0) {
+                            printf("LE case 3, counter == 0 so quit\n");
+                            stateLE = 5;
+                            break;
+                        }
 
-						tempMin = 257;
-						countedMs = 0;
-						for (int i = 0; i < MAX_NEIGHBORS; i++) {
-							neighborsVal[i] = 0;
-						}
+                        tempMin = 257;
+                        countedMs = 0;
+                        for (int i = 0; i < MAX_NEIGHBORS; i++) {
+                            neighborsVal[i] = 0;
+                        }
 
-						// line 6 of pseudocode
-						//msgAllNeighbors(min, leader, myIPv6);				
-						char msg[MAX_IPC_MESSAGE_SIZE] = "le_ack:";               
-						if(min < 10) {
-							sprintf(neighborM, "00%d",min);
-						} else if (min < 100) {
-							sprintf(neighborM, "0%d",min);
-						} else {
-							sprintf(neighborM, "%d",min);
-						}
-						strcat(msg,neighborM);
-						strcat(msg,":");
-						strcat(msg,leader);
-						strcat(msg,";");
-						strcat(msg,myIPv6);
-						ipc_msg_send(msg, udpServerPID, false);
-						stateLE = 2;
-					}
+                        // line 6 of pseudocode
+                        //msgAllNeighbors(min, leader, myIPv6);                
+                        char msg[MAX_IPC_MESSAGE_SIZE] = "le_ack:";               
+                        if(min < 10) {
+                            sprintf(neighborM, "00%d",min);
+                        } else if (min < 100) {
+                            sprintf(neighborM, "0%d",min);
+                        } else {
+                            sprintf(neighborM, "%d",min);
+                        }
+                        strcat(msg,neighborM);
+                        strcat(msg,":");
+                        strcat(msg,leader);
+                        strcat(msg,";");
+                        strcat(msg,myIPv6);
+                        ipc_msg_send(msg, udpServerPID, false);
+                        stateLE = 2;
+                    }
 
-					// go back to line 5 of pseudocode
-					//if (lastT1 < xtimer_now_usec64() - t1) {
-					//	stateLE = 2;
-					//}
-					break;
+                    // go back to line 5 of pseudocode
+                    //if (lastT1 < xtimer_now_usec64() - t1) {
+                    //    stateLE = 2;
+                    //}
+                    break;
                 case 5 :
                     printf("LE: %s elected as the leader, via m=%u!\n", leader, min);
                     if (strcmp(leader, myIPv6) == 0) {
                         printf("LE: Hey, that's me! I'm the leader!\n");
                     }
-					char msg[MAX_IPC_MESSAGE_SIZE] = "le_done:";
-					ipc_msg_send(msg, udpServerPID, false);
+                    char msg[MAX_IPC_MESSAGE_SIZE] = "le_done:";
+                    ipc_msg_send(msg, udpServerPID, false);
                     endTimeLE = (uint64_t)(xtimer_now_usec64()/1000000);
                     convergenceTimeLE = endTimeLE - startTimeLE;
                     printf("LE: leader election took %" PRIu64 " seconds to converge\n", convergenceTimeLE);
@@ -511,7 +511,7 @@ void *_leader_election(void *argv) {
         }
         
         xtimer_usleep(50000); // wait 0.05 seconds
-		//printf("LE: bottom\n");
+        //printf("LE: bottom\n");
     }
 
     for(int i = 0; i < MAX_NEIGHBORS; i++) {
@@ -525,8 +525,8 @@ void *_leader_election(void *argv) {
         res = msg_try_receive(&msg_p_in);
         if (res == 1) {
             if (msg_p_in.type == 2) { // report about the leader
-				if (DEBUG == 1)
-                	printf("LE: reporting that the leader is %s\n", leader);
+                if (DEBUG == 1)
+                    printf("LE: reporting that the leader is %s\n", leader);
                 ipc_msg_reply(leader, msg_p_in);
                 continue;
 

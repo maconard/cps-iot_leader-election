@@ -29,7 +29,7 @@
 #define IPV6_ADDRESS_LEN        (46)
 #define MAX_NEIGHBORS           (20)
 
-#define	DEBUG 	(0)
+#define    DEBUG     (0)
 
 // External functions defs
 extern int udp_send(int argc, char **argv);
@@ -108,12 +108,12 @@ int ipc_msg_send_receive(char *message, kernel_pid_t destinationPID, msg_t *resp
     msg_out.type = type;
 
     if (DEBUG == 1) 
-		printf("DEBUG: *send*/rec %s to %" PRIkernel_pid "\n", (char*)msg_out.content.ptr, destinationPID);
+        printf("DEBUG: *send*/rec %s to %" PRIkernel_pid "\n", (char*)msg_out.content.ptr, destinationPID);
     
     int res = msg_send_receive(&msg_out, response, destinationPID);
 
     if (DEBUG == 1) 
-		printf("DEBUG: send/*rec2* %s\n", (char*)msg_in.content.ptr);
+        printf("DEBUG: send/*rec2* %s\n", (char*)msg_in.content.ptr);
     
     return res;
 }
@@ -130,7 +130,7 @@ int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking) {
     //blocking = true;
 
     if (DEBUG == 1) 
-		printf("DEBUG: send %s to %" PRIkernel_pid ", type=%d\n", (char*)msg_out.content.ptr, destinationPID, msg_out.type);
+        printf("DEBUG: send %s to %" PRIkernel_pid ", type=%d\n", (char*)msg_out.content.ptr, destinationPID, msg_out.type);
     
     int res;
     if (blocking) {
@@ -152,7 +152,7 @@ int ipc_msg_reply(char *message, msg_t incoming) {
     msg_out.type = (uint16_t)strlen(message);
 
     if (DEBUG == 1) 
-		printf("DEBUG: reply %s\n", (char*)msg_out.content.ptr);
+        printf("DEBUG: reply %s\n", (char*)msg_out.content.ptr);
   
     int res = msg_reply(&incoming, &msg_out);
 
