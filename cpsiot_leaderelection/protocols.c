@@ -48,13 +48,22 @@ static msg_t msg_p_in;//, msg_out;
 
 kernel_pid_t udpServerPID = 0;
 
-// into t from s starting at a for length b
+// Purpose: write into t from s starting at index a for length b
+//
+// s char*, source string
+// t char*, destination string
+// a int, starting index in s
+// b int, length to copy from s following index a
 void substr(char *s, int a, int b, char *t) 
 {
     memset(t, 0, b);
     strncpy(t, s+a, b);
 }
 
+// Purpose: determine if an ipv6 address is already registered
+//
+// neighbors char**, list of registered neighbors
+// ipv6 char*, the address to check for
 int alreadyANeighbor(char **neighbors, char *ipv6) {
     for(int i = 0; i < MAX_NEIGHBORS; i++) {
         if(strcmp(neighbors[i], ipv6) == 0) return 1;
@@ -62,6 +71,10 @@ int alreadyANeighbor(char **neighbors, char *ipv6) {
     return 0;
 }
 
+// Purpose: retrieve the internal index of an address
+//
+// neighbors char**, list of registered neighbors
+// ipv6 char*, ipv6 to check for
 int getNeighborIndex(char **neighbors, char *ipv6) {
     for(int i = 0; i < MAX_NEIGHBORS; i++) {
         if(strcmp(neighbors[i], ipv6) == 0) return i;
@@ -69,6 +82,11 @@ int getNeighborIndex(char **neighbors, char *ipv6) {
     return -1;
 }
 
+// Purpose: send a message to all registered neighbors (currently has issues)
+//
+// min uint32_t, the min value to send out
+// leader char*, the ipv6 address of the current leader
+// me char*, my ipv6 address
 void msgAllNeighbors(uint32_t min, char *leader, char *me) {
     char msg[MAX_IPC_MESSAGE_SIZE] = "le_ack:"; 
     char neighborM[4] = { 0 };                   
@@ -89,6 +107,9 @@ void msgAllNeighbors(uint32_t min, char *leader, char *me) {
 	//xtimer_usleep(50000); // wait 0.05 seconds
 }
 
+// Purpose: find the index of a semicolon in a string for data packing
+//
+// ipv6 char*, string to check for the semicolon in
 int indexOfSemi(char *ipv6) {
 	for (uint32_t i = 0; i < strlen(ipv6); i++) {
 		if (ipv6[i]  == ';') {
@@ -98,6 +119,10 @@ int indexOfSemi(char *ipv6) {
 	return -1;
 }
 
+// Purpose: use ipv6 addresses to break ties 
+//
+// ipv6_a char*, the first ipv6 address
+// ipv6_b char*, the second ipv6 address
 // return -1 if a<b, 1 if a>b, 0 if a==b
 int minIPv6(char *ipv6_a, char *ipv6_b) {
 	uint32_t minLength = strlen(ipv6_a);
@@ -116,6 +141,10 @@ int minIPv6(char *ipv6_a, char *ipv6_b) {
 // ************************************
 // START MY CUSTOM THREAD DEFS
 
+// Purpose: launch the procotol thread
+//
+// argc int, argument count (should be 2)
+// argv char**, list of arguments ("leader_election",<port>)
 kernel_pid_t leader_election(int argc, char **argv) {
     if (argc != 2) {
         puts("Usage: leader_election <port>");
@@ -133,12 +162,17 @@ kernel_pid_t leader_election(int argc, char **argv) {
     return protocolPID;
 }
 
+// Purpose: the actual protocol thread code
+// Currently implements neighbor discovery and leader election
+//
+// argv void*, exists for RIOT semantics purposes (unused)
 void *_leader_election(void *argv) {
     (void)argv;
 
     msg_init_queue(_protocol_msg_queue, MAIN_QUEUE_SIZE);
     char msg_content[MAX_IPC_MESSAGE_SIZE];
 
+    // ipv6 address vars
     char ipv6[IPV6_ADDRESS_LEN] = { 0 };
     char ipv6_2[IPV6_ADDRESS_LEN] = { 0 };
     char myIPv6[IPV6_ADDRESS_LEN] = { 0 };
@@ -187,10 +221,10 @@ void *_leader_election(void *argv) {
     uint64_t t2 = T2;
     uint64_t lastT1 = 0;
     uint64_t lastT2 = 0;
-    
+
     printf("LE: Success - started protocol thread with m=%d\n", m);
     int res = 0;
-    while (1) {
+    while (1) { // main thread loop
         if (quit) break;
         // process messages
         memset(msg_content, 0, MAX_IPC_MESSAGE_SIZE);

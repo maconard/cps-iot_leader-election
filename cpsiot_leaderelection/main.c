@@ -94,7 +94,12 @@ const shell_command_t shell_commands[] = {
 };
 
 // IPC HELPER FUNCTIONS
-// send message to destinationPID and block for a reply
+// Purpose: send message to destinationPID and block for a reply
+//
+// message char*, the message to send out
+// destinationPID kernel_pid_t, the destination thread ID
+// response msg_t*, structure containing the response to our message
+// type uint16_t, the message type
 int ipc_msg_send_receive(char *message, kernel_pid_t destinationPID, msg_t *response, uint16_t type) {
     char msg[MAX_IPC_MESSAGE_SIZE];
     msg_t msg_out;
@@ -113,8 +118,12 @@ int ipc_msg_send_receive(char *message, kernel_pid_t destinationPID, msg_t *resp
     return res;
 }
 
-// send message to destinationPID, blocking or not
-int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking) {\
+// Purpose: send message to destinationPID, blocking or not
+//
+// message char*, the message to send out
+// destinationPID kernel_pid_t, the destination thread ID
+// blocking bool, whether or not to block for message to be received
+int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking) {
     msg_t msg_out;
     msg_out.content.ptr = message;
     msg_out.type = (uint16_t)strlen(message)+1;
@@ -133,7 +142,10 @@ int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking) {\
     return res;
 }
 
-// respond to incoming with message
+// Purpose: respond to an incoming message
+//
+// message char*, the message to reply with
+// incoming msg_t, the incoming message to reply to
 int ipc_msg_reply(char *message, msg_t incoming) {
     msg_t msg_out;
     msg_out.content.ptr = message;
@@ -147,7 +159,7 @@ int ipc_msg_reply(char *message, msg_t incoming) {
     return res;
 }
 
-// initiates leader election
+// initiates main program
 static int run(int argc, char **argv) {
     (void)argc;
     (void)argv;

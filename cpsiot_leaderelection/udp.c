@@ -57,17 +57,21 @@ bool runningLE = false;
 static bool server_running = false;
 const int SERVER_PORT = 3142;
 
+// Purpose: if LE is running, count the incoming packet
 void countMsgIn(void) {
     if (runningLE) messagesIn += 1;
 }
 
+// Purpose: if LE is running, count the outgoing packet
 void countMsgOut(void) {
     if (runningLE) messagesOut += 1;
 }
 
+// Purpose: main code for the UDP server
 void *_udp_server(void *args)
 {
     //printf("UDP: Entered UDP server code\n");
+    // socket server setup
     sock_udp_ep_t server = { .port = SERVER_PORT, .family = AF_INET6 };
     sock_udp_ep_t remote;
     msg_init_queue(server_msg_queue, SERVER_MSG_QUEUE_SIZE);
@@ -76,6 +80,7 @@ void *_udp_server(void *args)
     char ipv6[IPV6_ADDRESS_LEN] = { 0 };
     char myIPv6[IPV6_ADDRESS_LEN] = { 0 };
 
+    // create the socket
     if(sock_udp_create(&sock, &server, NULL, 0) < 0) {
         return NULL;
     }
@@ -89,6 +94,7 @@ void *_udp_server(void *args)
     msg_u_out.type = 0;
     msg_u_out.content.ptr = &myPid;
 
+    // establish thread communication
     printf("UDP: Trying to communicate with process PID=%" PRIkernel_pid  "\n", leaderPID);
     while (1) {
         if (failCount == 10) {
@@ -114,6 +120,7 @@ void *_udp_server(void *args)
         xtimer_sleep(200000); // wait 0.2 seconds
     }
 
+    // main server loop
     while (1) {
         // incoming UDP
         int res;
@@ -258,6 +265,10 @@ void *_udp_server(void *args)
     return NULL;
 }
 
+// Purpose: send a message to a specific target
+//
+// argc int, number of arguments (should be 4)
+// argv char**, list of arugments ("udp", <target-ipv6>, <port>, <message>)
 int udp_send(int argc, char **argv)
 {
     int res;
@@ -289,6 +300,10 @@ int udp_send(int argc, char **argv)
     return 0;
 }
 
+// Purpose: send out a multicast message
+//
+// argc int, number of arguments (should be 3)
+// argv char**, list of arugments ("udp", <port>, <message>)
 int udp_send_multi(int argc, char **argv)
 {
     //multicast: FF02::1
@@ -321,6 +336,10 @@ int udp_send_multi(int argc, char **argv)
     return 0;
 }
 
+// Purpose: creates the UDP server thread
+//
+// argc int, number of arguments (should be 2)
+// argv char**, list of arguments ("udps", <thread-pid>)
 int udp_server(int argc, char **argv)
 {
     if (argc != 2) {
