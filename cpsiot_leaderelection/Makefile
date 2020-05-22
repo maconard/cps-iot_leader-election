@@ -11,12 +11,12 @@ BOARD ?= iotlab-m3 # m3 nodes on iotlab
 RIOTBASE ?= $(CURDIR)/../..
 
 # Uncomment this to enable scheduler statistics for ps:
-USEMODULE += schedstatistics
+#USEMODULE += schedstatistics
 
 # Comment this out to disable code in RIOT that does safety checking
 # which is not needed in a production environment but helps in the
 # development process:
-DEVELHELP ?= 1
+#DEVELHELP ?= 1
 
 # Change this to 0 show compiler invocation lines by default:
 QUIET ?= 1
@@ -53,6 +53,9 @@ USEMODULE += netstats_ipv6
 USEMODULE += netstats_rpl
 
 USEMODULE += xtimer
+
+#STDIO_DEV = UART_DEV\(1\)
+#CFLAGS += -DSTDIO_UART_DEV=$(STDIO_DEV)
 
 CFLAGS += -DGNRC_PKTBUF_SIZE=512
 

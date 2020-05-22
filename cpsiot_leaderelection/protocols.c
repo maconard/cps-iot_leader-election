@@ -21,12 +21,12 @@
 
 #define CHANNEL 11
 
-#define MAIN_QUEUE_SIZE         (128)
-#define MAX_IPC_MESSAGE_SIZE    (256)
+#define MAIN_QUEUE_SIZE         (64)
+#define MAX_IPC_MESSAGE_SIZE    (128)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_NEIGHBORS           (20)
+#define MAX_NEIGHBORS           (10)
 
-#define DEBUG    (1)
+#define DEBUG    (0)
 
 // Leader Election values
 #define K     (5)
@@ -183,9 +183,11 @@ void *_leader_election(void *argv) {
     char neighborM[4] = { 0 };
 
     // array of MAX neighbors
+    int c = 0; // other counter
+    int i = 0; // loop counter
     int numNeighbors = 0;
     char **neighbors = (char**)calloc(MAX_NEIGHBORS, sizeof(char*));
-    for(int i = 0; i < MAX_NEIGHBORS; i++) {
+    for(i = 0; i < MAX_NEIGHBORS; i++) {
         neighbors[i] = (char*)calloc(IPV6_ADDRESS_LEN, sizeof(char));
     }
     uint32_t neighborsVal[MAX_NEIGHBORS] = { 0 };
@@ -200,7 +202,7 @@ void *_leader_election(void *argv) {
     uint64_t now;
     uint64_t startTimeLE = 0;
     uint64_t endTimeLE = 0;
-    uint64_t convergenceTimeLE;
+    uint16_t convergenceTimeLE = 0;
     bool hasElectedLeader = false;
     bool runningND = false;
     bool runningLE = false;
@@ -295,7 +297,7 @@ void *_leader_election(void *argv) {
             }
         }
 
-        xtimer_usleep(20000); // wait 0.02 seconds
+        xtimer_usleep(10000); // wait 0.01 seconds
         if (udpServerPID == 0) continue;
         
         // neighbor discovery
@@ -325,12 +327,15 @@ void *_leader_election(void *argv) {
                         //lastND = xtimer_now_usec64();
                         if (completeND) {
                             printf("Neighbor Discovery complete, %d neighbors:\n",numNeighbors);
-                            int c = 1;
-                            for (int i = 0; i < MAX_NEIGHBORS; i++) {
+                            c = 1;
+                            for (i = 0; i < MAX_NEIGHBORS; i++) {
+                                //printf("top of for loop: i=%d, c=%d, neigh=%s\n", i, c, neighbors[i]);
                                 if (strcmp(neighbors[i],"") == 0) 
                                     continue;
+                                //printf("before printing neighbor\n");
                                 printf("%2d: %s\n", c, neighbors[i]);
                                 c += 1;
+                                //printf("bottom of for loop");
                             }
                             delayLE = 0;
                         }
@@ -342,7 +347,10 @@ void *_leader_election(void *argv) {
             }
         }   
 
-        if(strlen(myIPv6) == 0) continue;
+        xtimer_usleep(10000); // wait 0.01 seconds
+        if(strlen(myIPv6) == 0) {
+            continue;
+        }
 
         // react to input, allowed after IPv6 init
         if (res == 1) {
@@ -354,7 +362,7 @@ void *_leader_election(void *argv) {
                 substr(msg_content, 11, j-11-1, ipv6); // obtain ID
                 //if (DEBUG == 1) printf("LE: found ; at %d\n", j);
                 substr(msg_content, j+1, IPV6_ADDRESS_LEN, ipv6_2); // obtain neighbor ID
-                int i = getNeighborIndex(neighbors, ipv6_2);
+                i = getNeighborIndex(neighbors, ipv6_2);
                 if (atoi(neighborM) <= 0) continue;
                 printf("LE: new m value %d from %s, id=%s\n", atoi(neighborM), ipv6_2, ipv6);
                 if (neighborsVal[i] == 0) countedMs++;
@@ -417,7 +425,7 @@ void *_leader_election(void *argv) {
                         lastT2 = xtimer_now_usec64();
                         tempMin = 257;
                         countedMs = 0;
-                        for (int i = 0; i < MAX_NEIGHBORS; i++) {
+                        for (i = 0; i < MAX_NEIGHBORS; i++) {
                             neighborsVal[i] = 0;
                         }
                     }
@@ -460,7 +468,7 @@ void *_leader_election(void *argv) {
 
                         tempMin = 257;
                         countedMs = 0;
-                        for (int i = 0; i < MAX_NEIGHBORS; i++) {
+                        for (i = 0; i < MAX_NEIGHBORS; i++) {
                             neighborsVal[i] = 0;
                         }
 
@@ -496,8 +504,8 @@ void *_leader_election(void *argv) {
                     char msg[MAX_IPC_MESSAGE_SIZE] = "le_done:";
                     ipc_msg_send(msg, udpServerPID, false);
                     endTimeLE = (uint64_t)(xtimer_now_usec64()/1000000);
-                    convergenceTimeLE = endTimeLE - startTimeLE;
-                    printf("LE: leader election took %" PRIu64 " seconds to converge\n", convergenceTimeLE);
+                    convergenceTimeLE = (uint16_t)(endTimeLE - startTimeLE);
+                    printf("LE: leader election took %"PRIu16" seconds to converge\n", convergenceTimeLE);
                     runningLE = false;
                     hasElectedLeader = true;
                     countedMs = 0;
@@ -512,7 +520,7 @@ void *_leader_election(void *argv) {
             }
         }
         
-        xtimer_usleep(40000); // wait 0.04 seconds
+        xtimer_usleep(50000); // wait 0.05 seconds
         //printf("LE: bottom\n");
     }
 

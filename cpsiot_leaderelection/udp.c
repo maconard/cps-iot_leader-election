@@ -24,12 +24,12 @@
 
 #define CHANNEL 11
 
-#define SERVER_MSG_QUEUE_SIZE   (128)
-#define SERVER_BUFFER_SIZE      (64)
+#define SERVER_MSG_QUEUE_SIZE   (64)
+#define SERVER_BUFFER_SIZE      (128)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_IPC_MESSAGE_SIZE    (256)
+#define MAX_IPC_MESSAGE_SIZE    (128)
 
-#define DEBUG    (1)
+#define DEBUG    (0)
 
 // External functions defs
 extern int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking);
@@ -130,7 +130,7 @@ void *_udp_server(void *args)
         memset(server_buffer, 0, SERVER_BUFFER_SIZE);
 
         if ((res = sock_udp_recv(&sock, server_buffer,
-                                 sizeof(server_buffer) - 1, .02 * US_PER_SEC, //SOCK_NO_TIMEOUT,
+                                 sizeof(server_buffer) - 1, 0.05 * US_PER_SEC, //SOCK_NO_TIMEOUT,
                                  &remote)) < 0) {
             if(res != 0 && res != -ETIMEDOUT && res != -EAGAIN) 
                 printf("UDP: Error - failed to receive UDP, %d\n", res);
@@ -160,7 +160,7 @@ void *_udp_server(void *args)
                 if (DEBUG == 1) 
                     printf("UDP: sent UDP message \"%s\" to %s\n", msg, ipv6);
 
-                xtimer_usleep(20000); // wait 0.02 seconds
+                xtimer_usleep(50000); // wait 0.05 seconds
 
                 // tell them their own IP address
                 char msg2[MAX_IPC_MESSAGE_SIZE] = "nd_hello:";
@@ -199,6 +199,8 @@ void *_udp_server(void *args)
                 
             }
         }
+
+        xtimer_usleep(50000); // wait 0.05 seconds
 
         // incoming thread message
         memset(msg_content, 0, MAX_IPC_MESSAGE_SIZE);
@@ -266,8 +268,6 @@ void *_udp_server(void *args)
                 printf("UDP: leader election complete, msgsIn: %d, msgsOut: %d, msgsTotal: %d\n", messagesIn, messagesOut, messagesIn + messagesOut);
             }
         }
-
-        xtimer_usleep(40000); // wait 0.04 seconds
     }
 
     return NULL;

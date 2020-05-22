@@ -26,12 +26,12 @@
 
 #define CHANNEL 11
 
-#define MAIN_QUEUE_SIZE         (128)
-#define MAX_IPC_MESSAGE_SIZE    (256)
+#define MAIN_QUEUE_SIZE         (64)
+#define MAX_IPC_MESSAGE_SIZE    (128)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_NEIGHBORS           (20)
+#define MAX_NEIGHBORS           (10)
 
-#define    DEBUG     (1)
+#define    DEBUG     (0)
 
 // External functions defs
 extern int udp_send(int argc, char **argv);
