@@ -4,4 +4,5 @@ bin/*
 .git
 *.sh
 *.xml
-
+out
+out/
