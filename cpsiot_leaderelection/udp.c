@@ -81,6 +81,7 @@ void *_udp_server(void *args)
     int failCount = 0;
     char ipv6[IPV6_ADDRESS_LEN] = { 0 };
     char myIPv6[IPV6_ADDRESS_LEN] = { 0 };
+    bool discovered = false;
 
     // create the socket
     if(sock_udp_create(&sock, &server, NULL, 0) < 0) {
@@ -149,46 +150,36 @@ void *_udp_server(void *args)
 
         // react to UDP message
         if (res == 1) {
-            // this neighbor is discovering us
-            if (strncmp(server_buffer,"nd_init",7) == 0) {
+            // the master is discovering us
+            if (strncmp(server_buffer,"ping",7) == 0) {
                 // acknowledge them discovering us
-                char port[5];
-                sprintf(port, "%d", SERVER_PORT);
-                char msg[MAX_IPC_MESSAGE_SIZE] = "nd_ack:";
-                char *argsMsg[] = { "udp_send", ipv6, port, msg, NULL };
-                udp_send(4, argsMsg);
+                if (!discovered) { 
+                    char port[5];
+                    sprintf(port, "%d", SERVER_PORT);
+                    char msg[MAX_IPC_MESSAGE_SIZE] = "pong:";
+                    char *argsMsg[] = { "udp_send", ipv6, port, msg, NULL };
+                    udp_send(4, argsMsg);
+                    if (DEBUG == 1) 
+                        printf("UDP: sent UDP message \"%s\" to %s\n", msg, ipv6);
+                }
+
+            // the master acknowledging our acknowledgement
+            } else if (strncmp(server_buffer,"conf",5) == 0) {
+                // processes confirmation
+                discovered = true;
                 if (DEBUG == 1) 
-                    printf("UDP: sent UDP message \"%s\" to %s\n", msg, ipv6);
+                    printf("UDP: master node confirmed us");
 
-                xtimer_usleep(50000); // wait 0.05 seconds
+            // information about our IP and neighbors
+            } else if (strncmp(server_buffer,"ips:",9) == 0) {
+                // process IP and neighbors
+                sprintf(myIPv6,"0"); // extract from message
+                (void)myIPv6;
+                // extract neighbors IPs from message
 
-                // tell them their own IP address
-                char msg2[MAX_IPC_MESSAGE_SIZE] = "nd_hello:";
-                strcat(msg2,ipv6);
-                char *argsMsg2[] = { "udp_send", ipv6, port, msg2, NULL };
-                udp_send(4, argsMsg2);
-                if (DEBUG == 1) 
-                    printf("UDP: sent UDP message \"%s\" to %s\n", msg2, ipv6);
-
-            // this neighbor is acknolwedging our discovery
-            } else if (strncmp(server_buffer,"nd_ack",6) == 0) {
-                // processes new neighbor
-                char msg[MAX_IPC_MESSAGE_SIZE] = "nd_ack:";
-                strcat(msg, ipv6);
-                ipc_msg_send(msg, leaderPID, false);
-                if (DEBUG == 1) 
-                    printf("UDP: sent IPC message \"%s\" to %" PRIkernel_pid "\n", msg, leaderPID);
-
-            // this neighbor is telling us our IP
-            } else if (strlen(myIPv6) == 0 && strncmp(server_buffer, "nd_hello:", 9) == 0){
-                // ip address update
-                substr(server_buffer, 9, IPV6_ADDRESS_LEN, myIPv6);
-                printf("UDP: My IP is %s\n", myIPv6);
-                msg_u_out.content.ptr = &myIPv6;
-                msg_u_out.type = 1;
-                msg_try_send(&msg_u_out, leaderPID);
-                countMsgOut();
-                //ipc_msg_send(myIPv6, leaderPID, false);
+            // start leader election
+            } else if (strncmp(server_buffer,"start:",6) == 0) {
+                // start leader election
 
             // this neighbor is sending is leader election values
             } else if (strncmp(server_buffer,"le_ack",6) == 0 || strncmp(server_buffer,"le_m?",5) == 0) {
@@ -218,30 +209,8 @@ void *_udp_server(void *args)
 
         // react to thread message
         if (res == 1) {
-            // start a neighbor discovery run
-            if (strncmp(msg_content,"nd_init",7) == 0) {
-                // send multicast neighbor discovery
-                char port[5];
-                sprintf(port, "%d", SERVER_PORT);
-                char *argsMsg[] = { "udp_send_multi", port, msg_content, NULL };
-                udp_send_multi(3, argsMsg);
-                if (DEBUG == 1) 
-                    printf("UDP: sent UDP message \"%s\" to multicast\n", msg_content);
-
-            // inform a neighbor of their IP
-            } else if (strncmp(msg_content,"nd_hello:",9) == 0) {
-                // send targeted neighbor hello
-                char port[5];
-                sprintf(port, "%d", SERVER_PORT);
-                substr(msg_content, 9, IPV6_ADDRESS_LEN, ipv6);
-                
-                char *argsMsg[] = { "udp_send", ipv6, port, msg_content, NULL };
-                udp_send(4, argsMsg);
-                if (DEBUG == 1) 
-                    printf("UDP: sent UDP message \"%s\" to %s\n", msg_content, ipv6);
-
             // start a leader election run
-            } else if (strncmp(msg_content,"le_init",7) == 0) {
+            if (strncmp(msg_content,"le_init",7) == 0) {
                 // send out m? queries
                 runningLE = true;
                 char port[5];

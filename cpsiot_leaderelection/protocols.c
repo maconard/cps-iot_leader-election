@@ -84,31 +84,6 @@ int getNeighborIndex(char **neighbors, char *ipv6) {
     return -1;
 }
 
-// Purpose: send a message to all registered neighbors (currently has issues)
-//
-// min uint32_t, the min value to send out
-// leader char*, the ipv6 address of the current leader
-// me char*, my ipv6 address
-void msgAllNeighbors(uint32_t min, char *leader, char *me) {
-    char msg[MAX_IPC_MESSAGE_SIZE] = "le_ack:"; 
-    char neighborM[4] = { 0 };                   
-    if(min < 10) {
-        sprintf(neighborM, "00%"PRIu32"",min);
-    } else if (min < 100) {
-        sprintf(neighborM, "0%"PRIu32"",min);
-    } else {
-        sprintf(neighborM, "%"PRIu32"",min);
-    }
-    strcat(msg,neighborM);
-    strcat(msg,":");
-    strcat(msg,leader);
-    strcat(msg,";");
-    strcat(msg,me);
-    ipc_msg_send(msg, udpServerPID, true);
-    if (DEBUG == 1) printf("LE: sent out new minimum info, %s and %s\n", neighborM, leader);
-    //xtimer_usleep(50000); // wait 0.05 seconds
-}
-
 // Purpose: find the index of a semicolon in a string for data packing
 //
 // ipv6 char*, string to check for the semicolon in
@@ -178,7 +153,6 @@ void *_leader_election(void *argv) {
     char ipv6[IPV6_ADDRESS_LEN] = { 0 };
     char ipv6_2[IPV6_ADDRESS_LEN] = { 0 };
     char myIPv6[IPV6_ADDRESS_LEN] = { 0 };
-    char initND[8] = "nd_init";
     char initLE[8] = "le_init";
     char neighborM[4] = { 0 };
 
@@ -194,25 +168,15 @@ void *_leader_election(void *argv) {
 
     random_init(xtimer_now_usec());  
 
-    uint64_t delayND = 3*1000000; //3sec
-    uint64_t delayLE = 40*1000000; //40sec
-    uint64_t lastND = xtimer_now_usec64();
-    uint64_t lastLE = xtimer_now_usec64();
-    uint64_t timeToRun;
-    uint64_t now;
     uint64_t startTimeLE = 0;
     uint64_t endTimeLE = 0;
     uint16_t convergenceTimeLE = 0;
     bool hasElectedLeader = false;
-    bool runningND = false;
     bool runningLE = false;
     bool allowLE = false;
-    int stateND = 0;
     int stateLE = 0;
     int countedMs = 0;
     bool quit = false;
-    bool completeND = false;
-    int countdownND = 3;
 
     // Ali's LE variables
     int counter = K; //k
@@ -228,7 +192,9 @@ void *_leader_election(void *argv) {
 
     printf("LE: Success - started protocol thread with m=%"PRIu32"\n", m);
     int res = 0;
-    while (1) { // main thread loop
+
+    // main thread startup loop
+    while (1) { 
         if (quit) break;
         // process messages
         memset(msg_content, 0, MAX_IPC_MESSAGE_SIZE);
@@ -278,79 +244,42 @@ void *_leader_election(void *argv) {
 
         // react to input, allowed anytime
         if (res == 1) {
-            if (numNeighbors < MAX_NEIGHBORS && strncmp(msg_content, "nd_ack:", 7) == 0) {
+            if (numNeighbors < MAX_NEIGHBORS && strncmp(msg_content, "neighbor:", 9) == 0) {
                 // a discovered neighbor has responded
-                substr(msg_content, 7, IPV6_ADDRESS_LEN, ipv6); // obtain neighbor's ID
+                substr(msg_content, 9, IPV6_ADDRESS_LEN, ipv6); // obtain neighbor's ID
                 if (!alreadyANeighbor(neighbors, ipv6)) {
                     strcpy(neighbors[numNeighbors], ipv6); // record their ID
                     printf("**********\nLE: recorded new neighbor, %s\n**********\n", (char*)neighbors[numNeighbors]);
                     numNeighbors++;
-
-                    //char msg[MAX_IPC_MESSAGE_SIZE] = "nd_hello:";
-                    //strcat(msg, ipv6);
-                    //ipc_msg_send(msg, udpServerPID, false);
-
-                    lastND = xtimer_now_usec64();
                 } else {
                     if (DEBUG == 1) printf("LE: Hi %s, we've already met\n", ipv6);
                 }
+            } else if (strncmp(msg_content, "start:", 6) == 0) {
+                quit = true;
+                break;
             }
         }
+        xtimer_usleep(50000); // wait 0.05 seconds
+    }
 
-        xtimer_usleep(10000); // wait 0.01 seconds
-        if (udpServerPID == 0) continue;
-        
-        // neighbor discovery
-        if (!runningND && !completeND && countdownND > 0) {
-            // check if it's time to run, then initialize
-            now = xtimer_now_usec64();
-            timeToRun = lastND + delayND;
-            if (now > timeToRun) {
-                lastND = xtimer_now_usec64();
-                (void) puts("LE: Running neighbor discovery...");
-                runningND = true;
-                countdownND -= 1;
-                if (countdownND == 0) completeND = true;
-            }
-        } else if (runningND) {
-            // perform neighbor discovery
-            switch(stateND) {   // check what state of neighbor discovery we are in
-                case 0 : // case 0: send out multicast ping
-                    ipc_msg_send(initND, udpServerPID, false);
-                    stateND = 1;
-                    break;
-                case 1 : // case 1: listen for acknowledgement
-                    if (lastND < xtimer_now_usec64() - delayND) {
-                        // if no acks for 3 seconds, terminate
-                        runningND = false;
-                        stateND = 0;
-                        //lastND = xtimer_now_usec64();
-                        if (completeND) {
-                            printf("Neighbor Discovery complete, %d neighbors:\n",numNeighbors);
-                            c = 1;
-                            for (i = 0; i < MAX_NEIGHBORS; i++) {
-                                //printf("top of for loop: i=%d, c=%d, neigh=%s\n", i, c, neighbors[i]);
-                                if (strcmp(neighbors[i],"") == 0) 
-                                    continue;
-                                //printf("before printing neighbor\n");
-                                printf("%2d: %s\n", c, neighbors[i]);
-                                c += 1;
-                                //printf("bottom of for loop");
-                            }
-                            delayLE = 0;
-                        }
-                    }
-                    break;
-                default:
-                    printf("LE: neighbor discovery in invalid state %d\n", stateND);
-                    break;
-            }
-        }   
-
-        xtimer_usleep(10000); // wait 0.01 seconds
-        if(strlen(myIPv6) == 0) {
+    // thread startup complete
+    printf("Topology assignment complete, %d neighbors:\n",numNeighbors);
+    c = 1;
+    for (i = 0; i < MAX_NEIGHBORS; i++) {
+        if (strcmp(neighbors[i],"") == 0) 
             continue;
-        }
+        printf("%2d: %s\n", c, neighbors[i]);
+        c += 1;
+    }
+    quit = false;
+
+    // main thread execution loop
+    while (1) {
+        if (quit) break;
+        // process messages
+        memset(msg_content, 0, MAX_IPC_MESSAGE_SIZE);
+        res = msg_try_receive(&msg_p_in);
+        //printf("LE: after msg_try_receive, code=%d\n", res);
 
         // react to input, allowed after IPv6 init
         if (res == 1) {
@@ -372,7 +301,6 @@ void *_leader_election(void *argv) {
                     tempMin = neighborsVal[i];
                     printf("LE: new tempMin=%"PRIu32", tempLeader=%s\n", tempMin, tempLeader);
                 } 
-                lastLE = xtimer_now_usec64();
             } else if (numNeighbors > 0 && strncmp(msg_content, "le_m?:", 6) == 0) {
                 // someone wants my m
                 //msgAllNeighbors(min, leader, myIPv6);                
@@ -395,10 +323,7 @@ void *_leader_election(void *argv) {
 
         if (!runningLE && !hasElectedLeader) {
             // check if it's time to run, then initialize
-            now = xtimer_now_usec64();
-            timeToRun = lastLE + delayLE;
-            if (numNeighbors > 0 && !hasElectedLeader && allowLE && now > timeToRun) {
-                lastLE = xtimer_now_usec64();
+            if (numNeighbors > 0 && !hasElectedLeader && allowLE) {
                 (void) puts("LE: Running leader election...");
                 runningLE = true;
                 allowLE = false;
@@ -510,11 +435,10 @@ void *_leader_election(void *argv) {
                     hasElectedLeader = true;
                     countedMs = 0;
                     stateLE = 0;
-                    lastLE = xtimer_now_usec64();
                     quit = true;
                     break;
                 default:
-                    printf("LE: neighbor discovery in invalid state %d\n", stateND);
+                    printf("LE: leader election in invalid state %d\n", stateLE);
                     return 0;
                     break;
             }

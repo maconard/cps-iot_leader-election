@@ -4,8 +4,8 @@
 APPLICATION = my_project
 
 # If no BOARD is found in the environment, use this default:
-BOARD ?= native # native for testing
-#BOARD ?= iotlab-m3 # m3 nodes on iotlab
+#BOARD ?= native # native for testing
+BOARD ?= iotlab-m3 # m3 nodes on iotlab
 
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..

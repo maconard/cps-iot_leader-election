@@ -1,0 +1,9 @@
+*/bin
+*/bin/
+*/bin/*
+.git
+*.sh
+*.xml
+*/out
+*/out/
+*/out/*
