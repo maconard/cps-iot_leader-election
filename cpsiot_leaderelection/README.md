@@ -1,24 +1,15 @@
-Michael's Leader Election Project
+Worker Node - Leader Election Project
 ================
 This application run's leader election on RIOT OS nodes.
-
-To do this, the application uses the `shell` and `shell_commands` modules and all the driver modules each board supports.
-
-`shell` is a very simple interactive command interpreter that can be used to call functions.  Many of RIOT's modules define some generic shell commands. These are included via the `shell_commands` module.
 
 Usage
 =====
 
-Build, flash and start the application:
-```
-make all term PORT=your_port
-```
+Requires exactly one master node to be running in the same topology. Launch N worker nodes along with 1 master node.
 
-The `term` make target starts a terminal emulator for your node. It connects to a default port so you can interact with the shell.
+To do this on `native` you need a RIOT topology XML file that represents a complete graph topology across all the workers and the master. This is because the master node will establish an overlay topology that represents the actual topology you want to test. You can create this topology using the `mac_topology_gen` script with `--t complete` and `--s N+1`. Make sure to modify the resulting XML to change the last node's name to "master" and to change it's executable path to the master node executable. 
 
-For hardware, probably: `PORT=/dev/ttyUSB0`.  
-For virtual native linux nodes, create taps/tuns and set the `PORT=yourTap` variable in the make statement.
-
+For `iot-m3` nodes launch an IoT-Lab experiment with `N+1` nodes and the worker executable, then go into the experiment details and simply reflash the node you want to be the master with the master executable, then reset all nodes. 
 
 RIOT Shell
 ==============
@@ -38,11 +29,6 @@ The `ifconfig` command will help you to configure all available network interfac
 Type `ifconfig help` to get an online help for all available options (e.g. setting the radio channel via `ifconfig 4 set chan 12`).
 
 The `txtsnd` command allows you to send a simple string directly over the link layer using unicast or multicast. The application will also automatically print information about any received packet over the serial. This will look like.
-
-My Protocols
-==========
-
-Neighbor Discovery will run automatically as soon as the protocols thread has established communication with the UDP thread. Leader Election will initiate after some fixed delay and at least two neighbors have been discovered.
 
 My Scripts
 ==========
