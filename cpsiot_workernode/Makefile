@@ -1,7 +1,7 @@
 # Author: Michael Conard
 
 # name of your application
-APPLICATION = my_project
+APPLICATION = worker_node
 
 # If no BOARD is found in the environment, use this default:
 #BOARD ?= native # native for testing
