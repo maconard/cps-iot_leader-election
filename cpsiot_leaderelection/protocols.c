@@ -24,9 +24,9 @@
 #define MAIN_QUEUE_SIZE         (64)
 #define MAX_IPC_MESSAGE_SIZE    (128)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_NEIGHBORS           (10)
+#define MAX_NEIGHBORS           (8)
 
-#define DEBUG    (0)
+#define    DEBUG     (1)
 
 // Leader Election values
 #define K     (5)
@@ -37,6 +37,8 @@
 extern int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking);
 extern int ipc_msg_reply(char *message, msg_t incoming);
 extern int ipc_msg_send_receive(char *message, kernel_pid_t destinationPID, msg_t *response, uint16_t type);
+extern void substr(char *s, int a, int b, char *t);
+extern int indexOfSemi(char *ipv6);
 
 // Forward declarations
 kernel_pid_t leader_election(int argc, char **argv);
@@ -49,18 +51,6 @@ static msg_t _protocol_msg_queue[MAIN_QUEUE_SIZE];
 static msg_t msg_p_in;//, msg_out;
 
 kernel_pid_t udpServerPID = 0;
-
-// Purpose: write into t from s starting at index a for length b
-//
-// s char*, source string
-// t char*, destination string
-// a int, starting index in s
-// b int, length to copy from s following index a
-void substr(char *s, int a, int b, char *t) 
-{
-    memset(t, 0, b);
-    strncpy(t, s+a, b);
-}
 
 // Purpose: determine if an ipv6 address is already registered
 //
@@ -80,18 +70,6 @@ int alreadyANeighbor(char **neighbors, char *ipv6) {
 int getNeighborIndex(char **neighbors, char *ipv6) {
     for(int i = 0; i < MAX_NEIGHBORS; i++) {
         if(strcmp(neighbors[i], ipv6) == 0) return i;
-    }
-    return -1;
-}
-
-// Purpose: find the index of a semicolon in a string for data packing
-//
-// ipv6 char*, string to check for the semicolon in
-int indexOfSemi(char *ipv6) {
-    for (uint32_t i = 0; i < strlen(ipv6); i++) {
-        if (ipv6[i]  == ';') {
-            return i+1; // start of second id
-        }
     }
     return -1;
 }

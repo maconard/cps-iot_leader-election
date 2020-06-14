@@ -31,7 +31,7 @@
 #define IPV6_ADDRESS_LEN        (46)
 #define MAX_NEIGHBORS           (10)
 
-#define    DEBUG     (0)
+#define    DEBUG     (1)
 
 // External functions defs
 extern int udp_send(int argc, char **argv);
@@ -94,6 +94,31 @@ const shell_command_t shell_commands[] = {
     {"leader", "reports who the current leader is", who_is_leader},
     { NULL, NULL, NULL }
 };
+
+
+// Purpose: find the index of a semicolon in a string for data packing
+//
+// ipv6 char*, string to check for the semicolon in
+int indexOfSemi(char *ipv6) {
+    for (uint32_t i = 0; i < strlen(ipv6); i++) {
+        if (ipv6[i]  == ';') {
+            return i+1; // start of second id
+        }
+    }
+    return -1;
+}
+
+// Purpose: write into t from s starting at index a for length b
+//
+// s char*, source string
+// t char*, destination string
+// a int, starting index in s
+// b int, length to copy from s following index a
+void substr(char *s, int a, int b, char *t) 
+{
+    memset(t, 0, b);
+    strncpy(t, s+a, b);
+}
 
 // IPC HELPER FUNCTIONS
 // Purpose: send message to destinationPID and block for a reply
@@ -167,13 +192,13 @@ static int run(int argc, char **argv) {
     (void)argv;
 
     // start ipv6 support thread
-    (void) puts("MAIN: Trying to start IPv6 thread");
-    int ipv6_thread = gnrc_ipv6_init();
-    if(ipv6_thread == EOVERFLOW || ipv6_thread == EEXIST) {
-        (void) puts("MAIN: Error - failed to start ipv6 thread");
-        return -1;
-    }
-    (void) puts("MAIN: Launched IPv6 thread");
+    //(void) puts("MAIN: Trying to start IPv6 thread");
+    //int ipv6_thread = gnrc_ipv6_init();
+    //if(ipv6_thread == EOVERFLOW || ipv6_thread == EEXIST) {
+    //    (void) puts("MAIN: Error - failed to start ipv6 thread");
+    //    return -1;
+    //}
+    //(void) puts("MAIN: Launched IPv6 thread");
 
     // start my protocol thread
     (void) puts("MAIN: Trying to start protocol thread");
@@ -206,8 +231,8 @@ static int run(int argc, char **argv) {
 int main(void)
 {
     // initialize networking and packet tools
-    gnrc_netreg_entry_t dump = GNRC_NETREG_ENTRY_INIT_PID(GNRC_NETREG_DEMUX_CTX_ALL, gnrc_pktdump_pid);
-    gnrc_netreg_register(GNRC_NETTYPE_UNDEF, &dump);
+    //gnrc_netreg_entry_t dump = GNRC_NETREG_ENTRY_INIT_PID(GNRC_NETREG_DEMUX_CTX_ALL, gnrc_pktdump_pid);
+    //gnrc_netreg_register(GNRC_NETTYPE_UNDEF, &dump);
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
 
     run(0, NULL);

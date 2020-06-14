@@ -29,12 +29,12 @@
 #define IPV6_ADDRESS_LEN        (46)
 #define MAX_IPC_MESSAGE_SIZE    (128)
 
-#define MAX_NODES               (20)
+#define MAX_NODES               (8)
 
-// ring, line, grid, mesh
-#define TOPO                    "ring"
+// 1=ring, 2=line, grid, mesh
+#define MY_TOPO                 (1)
 
-#define DEBUG    (0)
+#define DEBUG                   (1)
 
 // Forward declarations
 void *_udp_server(void *args);
@@ -99,7 +99,7 @@ void *_udp_server(void *args)
 
     uint64_t lastDiscover = 0;
     uint64_t wait = 5*1000000; // 5 seconds
-    int discoverLoops = 5; // 25 seconds of discovery
+    int discoverLoops = 3; // 15 seconds of discovery
 
     // create the socket
     if(sock_udp_create(&sock, &server, NULL, 0) < 0) {
@@ -120,6 +120,7 @@ void *_udp_server(void *args)
             char *argsMsg[] = { "udp_send_multi", portBuf, msg, NULL };
             udp_send_multi(3, argsMsg);
             discoverLoops--;
+            lastDiscover = xtimer_now_usec64();
         }
     
         // incoming UDP
@@ -150,9 +151,11 @@ void *_udp_server(void *args)
             if (strncmp(server_buffer,"pong",7) == 0) {
                 // if node with this ipv6 is already found, ignore
                 // otherwise record them
-                if (!alreadyANeighbor(nodes, ipv6)) {
-                    printf("UDP: recorded new node, %s\n", (char*)nodes[numNodes]);
+                int found = alreadyANeighbor(nodes, ipv6);
+                printf("For IP=%s, found=%d\n", ipv6, found);
+                if (found == 0) {
                     strcpy(nodes[numNodes], ipv6);
+                    printf("UDP: recorded new node, %s\n", nodes[numNodes]);
                     numNodes++;
                 
                     // send back discovery confirmation
@@ -166,19 +169,79 @@ void *_udp_server(void *args)
         xtimer_usleep(50000); // wait 0.05 seconds
     }
 
+    printf("Node discovery complete, %d nodes:\n",numNodes);
+    int c = 1;
+    for (i = 0; i < MAX_NODES; i++) {
+        if (strcmp(nodes[i],"") == 0) 
+            continue;
+        printf("%2d: %s\n", c, nodes[i]);
+        c += 1;
+    }
+
     // send out topology info to all discovered nodes
-    if (strcmp(TOPO, "ring")) {
-        
-    } else if (strcmp(TOPO, "line")) {
-        
+    if (MY_TOPO == 1) {
+        // compose message, "ips:<yourIP>;<neighbor1>;<neighbor2>;
+        printf("UDP: generating ring topology\n");
+        for(i = 0; i < numNodes; i++) {
+            int pre = (i-1);
+            int post = (i+1);
+
+            if(pre == -1) pre = numNodes-1;
+            if(post == numNodes) post = 0;
+
+            printf("UDP: in for loop %d, pre/post: %d/%d\n", i, pre, post);
+            char msg[SERVER_BUFFER_SIZE] = "ips:";
+            
+            strcat(msg, nodes[i]);
+            strcat(msg, ";");
+            strcat(msg, nodes[pre]);
+            strcat(msg, ";");
+            strcat(msg, nodes[post]);
+            strcat(msg, ";");
+
+            printf("UDP: Sending topology to %s, %s\n", nodes[i], msg);
+
+            char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
+            udp_send(4, argsMsg);
+        }
+    } else if (MY_TOPO == 2) {
+        // compose message, "ips:<yourIP>;<neighbor1>;<neighbor2>;
+        printf("UDP: generating line topology\n");
+        for(i = 0; i < numNodes; i++) {
+            printf("***%d: in for loop\n", i);
+            char msg[SERVER_BUFFER_SIZE] = "ips:";
+            printf("***%d: after buff\n", i);
+            
+            strcat(msg, nodes[i]);
+            strcat(msg, ";");
+            if(i > 0) {
+                strcat(msg, nodes[(i-1)%numNodes]);
+                strcat(msg, ";");
+            }
+            if(i < numNodes-1) {
+                strcat(msg, nodes[(i+1)%numNodes]);
+                strcat(msg, ";");
+            }
+
+            printf("UDP: Sending topology to %s, %s\n", nodes[i], msg);
+
+            char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
+            udp_send(4, argsMsg);
+        }  
     }
 
     // synchronization? tell nodes to go?
+    xtimer_usleep(5000000); // wait 5 seconds
+    for(i = 0; i < numNodes; i++) {
+        char msg[7] = "start:";
+        char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
+        udp_send(4, argsMsg);
+    }
+
+    printf("UDP: start messages sent\n");
 
     // termination loop, waiting for info on protocol termination
     while (1) {
-        // David?
-
         // incoming UDP
         int res;
         memset(msg_content, 0, MAX_IPC_MESSAGE_SIZE);
@@ -203,6 +266,7 @@ void *_udp_server(void *args)
 
         // handle UDP message
         if (res == 1) {
+            // David? TODO
             // react to final messages about election results, convergence, etc
             if (strncmp(server_buffer,"something",7) == 0) {
                 

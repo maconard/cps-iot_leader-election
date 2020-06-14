@@ -29,9 +29,9 @@
 #define MAIN_QUEUE_SIZE         (64)
 #define MAX_IPC_MESSAGE_SIZE    (128)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_NODES               (10)
+#define MAX_NODES               (8)
 
-#define    DEBUG     (0)
+#define    DEBUG     (1)
 
 // External functions defs
 extern int udp_send(int argc, char **argv);
@@ -72,19 +72,19 @@ static int run(int argc, char **argv) {
     (void)argv;
 
     // start ipv6 support thread
-    (void) puts("MAIN: Trying to start IPv6 thread");
-    int ipv6_thread = gnrc_ipv6_init();
-    if(ipv6_thread == EOVERFLOW || ipv6_thread == EEXIST) {
-        (void) puts("MAIN: Error - failed to start ipv6 thread");
-        return -1;
-    }
-    (void) puts("MAIN: Launched IPv6 thread");
+    //(void) puts("MAIN: Trying to start IPv6 thread");
+    //int ipv6_thread = gnrc_ipv6_init();
+    //if(ipv6_thread == EOVERFLOW || ipv6_thread == EEXIST) {
+    //    (void) puts("MAIN: Error - failed to start ipv6 thread");
+    //    return -1;
+    //}
+    //(void) puts("MAIN: Launched IPv6 thread");
 
     // start internal UDP server
     (void) puts("MAIN: Trying to launch UDP server thread");
     char *argsUDP[] = { "udp_server", NULL };
     
-    if (udp_server(2, argsUDP) == -1) {
+    if (udp_server(1, argsUDP) == -1) {
         (void) puts("MAIN: Error - failed to start UDP server thread");
     }
     (void) puts("MAIN: Launched UDP server thread");
@@ -96,13 +96,16 @@ static int run(int argc, char **argv) {
 int main(void)
 {
     // initialize networking and packet tools
-    gnrc_netreg_entry_t dump = GNRC_NETREG_ENTRY_INIT_PID(GNRC_NETREG_DEMUX_CTX_ALL, gnrc_pktdump_pid);
-    gnrc_netreg_register(GNRC_NETTYPE_UNDEF, &dump);
+    //gnrc_netreg_entry_t dump = GNRC_NETREG_ENTRY_INIT_PID(GNRC_NETREG_DEMUX_CTX_ALL, gnrc_pktdump_pid);
+    //gnrc_netreg_register(GNRC_NETTYPE_UNDEF, &dump);
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
 
     run(0, NULL);
 
     (void) puts("MAIN: Welcome to RIOT!");
+
+
+    printf("MAIN: starting master node");
 
     // start the RIOT shell for this node
     char line_buf[SHELL_DEFAULT_BUFSIZE];
