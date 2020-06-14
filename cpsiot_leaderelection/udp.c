@@ -288,7 +288,16 @@ void *_udp_server(void *args)
                 // leader election finished!
                 printf("UDP: leader election complete, msgsIn: %d, msgsOut: %d, msgsTotal: %d\n", messagesIn, messagesOut, messagesIn + messagesOut);
 
+                // send information to the master node?
+                // IP address of master node in masterIP variable
                 // David? TODO
+
+                //char port[5];
+                //sprintf(port, "%d", SERVER_PORT);
+                //char msg[SERVER_BUFFER_SIZE] = "information...";
+                //char *argsMsg[] = { "udp_send", ipv6, port, msg, NULL };
+                //udp_send(4, argsMsg);
+                // ...
             }
         }
     }
