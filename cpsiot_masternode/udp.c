@@ -22,19 +22,19 @@
 #include "net/sock/udp.h"
 #include "net/ipv6/addr.h"
 
-#define CHANNEL                 (11)
+#define CHANNEL                 11
 
 #define SERVER_MSG_QUEUE_SIZE   (64)
-#define SERVER_BUFFER_SIZE      (256)
+#define SERVER_BUFFER_SIZE      (128)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_IPC_MESSAGE_SIZE    (256)
+#define MAX_IPC_MESSAGE_SIZE    (128)
 
-#define MAX_NODES               (8)
+#define MAX_NODES               (20)
 
 // 1=ring, 2=line, grid, mesh
 #define MY_TOPO                 (1)
 
-#define DEBUG                   (1)
+#define DEBUG                   1
 
 // Forward declarations
 void *_udp_server(void *args);
@@ -184,7 +184,7 @@ void *_udp_server(void *args)
         // compose message, "ips:<yourIP>;<neighbor1>;<neighbor2>;
         printf("UDP: generating ring topology\n");
         int j;
-        for (j = 0; j < 3; j++) { // send topology info 3 times
+        for (j = 0; j < 1; j++) { // send topology info 1 time(s)
             for (i = 0; i < numNodes; i++) {
                 int pre = (i-1);
                 int post = (i+1);

@@ -24,12 +24,12 @@
 #include "net/gnrc/ndp.h"
 #include "net/gnrc/pkt.h"
 
-#define CHANNEL 11
+#define CHANNEL                 11
 
-#define MAIN_QUEUE_SIZE         (64)
+#define MAIN_QUEUE_SIZE         (32)
 #define MAX_IPC_MESSAGE_SIZE    (128)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_NEIGHBORS           (10)
+#define MAX_NEIGHBORS           (8)
 
 #define DEBUG                   0
 
