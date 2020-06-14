@@ -45,6 +45,9 @@ static int run(int argc, char **argv);
 int ipc_msg_send_receive(char *message, kernel_pid_t destinationPID, msg_t *response, uint16_t type);
 int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking);
 int ipc_msg_reply(char *message, msg_t incoming);
+void substr(char *s, int a, int b, char *t);
+void extractIP(char **s, char *t);
+int indexOfSemi(char *ipv6);
 
 // Data structures (i.e. stacks, queues, message structs, etc)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
@@ -106,6 +109,20 @@ int indexOfSemi(char *ipv6) {
         }
     }
     return -1;
+}
+
+// Purpose: write into t from s by extracting the next IP from the list
+//
+// s char*, source string
+// t char*, destination string
+void extractIP(char **s, char *t) 
+{
+    int in;
+    
+    in = indexOfSemi(*s);   
+    memset(t, 0, in); 
+    substr(*s, 0, in-1, t);
+    *s += in;
 }
 
 // Purpose: write into t from s starting at index a for length b

@@ -25,9 +25,9 @@
 #define CHANNEL                 (11)
 
 #define SERVER_MSG_QUEUE_SIZE   (64)
-#define SERVER_BUFFER_SIZE      (128)
+#define SERVER_BUFFER_SIZE      (256)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_IPC_MESSAGE_SIZE    (128)
+#define MAX_IPC_MESSAGE_SIZE    (256)
 
 #define MAX_NODES               (8)
 
@@ -182,27 +182,31 @@ void *_udp_server(void *args)
     if (MY_TOPO == 1) {
         // compose message, "ips:<yourIP>;<neighbor1>;<neighbor2>;
         printf("UDP: generating ring topology\n");
-        for(i = 0; i < numNodes; i++) {
-            int pre = (i-1);
-            int post = (i+1);
+        int j;
+        for(j = 0; j < 3; j++) { // send topology info 3 times
+            for(i = 0; i < numNodes; i++) {
+                int pre = (i-1);
+                int post = (i+1);
 
-            if(pre == -1) pre = numNodes-1;
-            if(post == numNodes) post = 0;
+                if(pre == -1) pre = numNodes-1;
+                if(post == numNodes) post = 0;
 
-            printf("UDP: in for loop %d, pre/post: %d/%d\n", i, pre, post);
-            char msg[SERVER_BUFFER_SIZE] = "ips:";
-            
-            strcat(msg, nodes[i]);
-            strcat(msg, ";");
-            strcat(msg, nodes[pre]);
-            strcat(msg, ";");
-            strcat(msg, nodes[post]);
-            strcat(msg, ";");
+                printf("UDP: in for loop %d, pre/post: %d/%d\n", i, pre, post);
+                char msg[SERVER_BUFFER_SIZE] = "ips:";
+                
+                strcat(msg, nodes[i]);
+                strcat(msg, ";");
+                strcat(msg, nodes[pre]);
+                strcat(msg, ";");
+                strcat(msg, nodes[post]);
+                strcat(msg, ";");
 
-            printf("UDP: Sending topology to %s, %s\n", nodes[i], msg);
+                printf("UDP: Sending topology to %s, %s\n", nodes[i], msg);
 
-            char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
-            udp_send(4, argsMsg);
+                char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
+                udp_send(4, argsMsg);
+            }
+            xtimer_usleep(1000000); // wait 1 seconds
         }
     } else if (MY_TOPO == 2) {
         // compose message, "ips:<yourIP>;<neighbor1>;<neighbor2>;

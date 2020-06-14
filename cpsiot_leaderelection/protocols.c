@@ -22,7 +22,7 @@
 #define CHANNEL 11
 
 #define MAIN_QUEUE_SIZE         (64)
-#define MAX_IPC_MESSAGE_SIZE    (128)
+#define MAX_IPC_MESSAGE_SIZE    (256)
 #define IPV6_ADDRESS_LEN        (46)
 #define MAX_NEIGHBORS           (8)
 
@@ -39,6 +39,7 @@ extern int ipc_msg_reply(char *message, msg_t incoming);
 extern int ipc_msg_send_receive(char *message, kernel_pid_t destinationPID, msg_t *response, uint16_t type);
 extern void substr(char *s, int a, int b, char *t);
 extern int indexOfSemi(char *ipv6);
+extern void extractIP(char **s, char *t);
 
 // Forward declarations
 kernel_pid_t leader_election(int argc, char **argv);
@@ -167,6 +168,7 @@ void *_leader_election(void *argv) {
     uint64_t t2 = T2;
     uint64_t lastT1 = 0;
     uint64_t lastT2 = 0;
+    bool topoComplete = false;
 
     printf("LE: Success - started protocol thread with m=%"PRIu32"\n", m);
     int res = 0;
@@ -232,6 +234,27 @@ void *_leader_election(void *argv) {
                 } else {
                     if (DEBUG == 1) printf("LE: Hi %s, we've already met\n", ipv6);
                 }
+            } else if (strncmp(msg_content, "ips:", 4) == 0) {
+                if (!topoComplete) {
+                    char *msg = malloc(MAX_IPC_MESSAGE_SIZE);
+                    char *mem = msg;
+                    substr(msg_content, 4, strlen(msg_content)-4, msg);
+                    extractIP(&msg,myIPv6);
+                    strcpy(leader, myIPv6);
+                    printf("LE: Protocol thread recorded %s as it's IPv6\n", leader);
+                    allowLE = true;
+
+                    // extract neighbors IPs from message
+                    while(strlen(msg) > 1) {
+                        extractIP(&msg,neighbors[numNeighbors]);
+                        printf("LE: Extracted neighbor %s\n", neighbors[numNeighbors]);
+                        numNeighbors++;
+                    }
+                    
+                    topoComplete = true;
+                    free(mem);
+                }
+
             } else if (strncmp(msg_content, "start:", 6) == 0) {
                 quit = true;
                 break;
@@ -254,17 +277,33 @@ void *_leader_election(void *argv) {
     // main thread execution loop
     while (1) {
         if (quit) break;
-        // process messages
+        // receive messages
         memset(msg_content, 0, MAX_IPC_MESSAGE_SIZE);
         res = msg_try_receive(&msg_p_in);
-        //printf("LE: after msg_try_receive, code=%d\n", res);
 
-        // react to input, allowed after IPv6 init
         if (res == 1) {
-            if (numNeighbors > 0 && strncmp(msg_content, "le_ack:", 7) == 0) {
+            // processing
+            if (msg_p_in.type > 2 && msg_p_in.type < MAX_IPC_MESSAGE_SIZE) { // process string message of size msg_p_in.type
+
+                //printf("LE: in type>2 block, type=%u\n", (uint16_t)msg_p_in.type);
+                strncpy(msg_content, (char*)msg_p_in.content.ptr, (uint16_t)msg_p_in.type+1);
+                if (DEBUG == 1) 
+                    printf("LE: Protocol thread received IPC message: %s from PID=%" PRIkernel_pid " with type=%d\n", msg_content, msg_p_in.sender_pid, msg_p_in.type);
+
+            } else {
+
+                (void) puts("LE: Protocol thread received an illegal or too large IPC message");
+                continue;
+
+            }
+
+            // react
+            printf("LE: message received: %s\n", msg_content);
+            if (strncmp(msg_content, "le_ack:", 7) == 0) {
                 // a neighbor has responded
                 // le_ack:mmm:ipv6_owner;ipv6_sender
                 substr(msg_content, 7, 3, neighborM); // obtain m value
+                printf("LE: extracted m=%s\n", neighborM);
                 int j = indexOfSemi(msg_content);
                 substr(msg_content, 11, j-11-1, ipv6); // obtain ID
                 //if (DEBUG == 1) printf("LE: found ; at %d\n", j);
@@ -279,9 +318,8 @@ void *_leader_election(void *argv) {
                     tempMin = neighborsVal[i];
                     printf("LE: new tempMin=%"PRIu32", tempLeader=%s\n", tempMin, tempLeader);
                 } 
-            } else if (numNeighbors > 0 && strncmp(msg_content, "le_m?:", 6) == 0) {
-                // someone wants my m
-                //msgAllNeighbors(min, leader, myIPv6);                
+            } else if (strncmp(msg_content, "le_m?:", 6) == 0) {
+                // someone wants my m              
                 char msg[MAX_IPC_MESSAGE_SIZE] = "le_ack:";               
                 if(min < 10) {
                     sprintf(neighborM, "00%"PRIu32"",min);
@@ -299,6 +337,7 @@ void *_leader_election(void *argv) {
             }
         }
 
+        // leader election
         if (!runningLE && !hasElectedLeader) {
             // check if it's time to run, then initialize
             if (numNeighbors > 0 && !hasElectedLeader && allowLE) {
@@ -343,7 +382,8 @@ void *_leader_election(void *argv) {
                     }
                     break;
                 case 3 : // case 3: lines 5a-f of pseudocode, some contained in response above
-                    if (countedMs == numNeighbors || lastT2 < xtimer_now_usec64() - t2) {
+                    //countedMs == numNeighbors || 
+                    if (lastT2 < xtimer_now_usec64() - t2) {
                         printf("LE: case 3, leader=%s, min=%"PRIu32", heardFrom=%d, counter=%d\n", leader, min, countedMs, counter);
                         
                         if (tempMin < min) {

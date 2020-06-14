@@ -27,7 +27,7 @@
 #define SERVER_MSG_QUEUE_SIZE   (64)
 #define SERVER_BUFFER_SIZE      (256)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_IPC_MESSAGE_SIZE    (128)
+#define MAX_IPC_MESSAGE_SIZE    (256)
 #define MAX_NEIGHBORS           (8)
 
 #define    DEBUG     (1)
@@ -38,6 +38,7 @@ extern int ipc_msg_reply(char *message, msg_t incoming);
 extern int ipc_msg_send_receive(char *message, kernel_pid_t destinationPID, msg_t *response, uint16_t type);
 extern void substr(char *s, int a, int b, char *t);
 extern int indexOfSemi(char *ipv6);
+extern void extractIP(char **s, char *t);
 
 // Forward declarations
 void *_udp_server(void *args);
@@ -71,20 +72,6 @@ void countMsgOut(void) {
     if (runningLE) messagesOut += 1;
 }
 
-// Purpose: write into t from s by extracting the next IP from the list
-//
-// s char*, source string
-// t char*, destination string
-void extractIP(char **s, char *t) 
-{
-    int in;
-    
-    in = indexOfSemi(*s);   
-    memset(t, 0, in); 
-    substr(*s, 0, in-1, t);
-    *s += in;
-}
-
 // Purpose: main code for the UDP serverS
 void *_udp_server(void *args)
 {
@@ -97,10 +84,11 @@ void *_udp_server(void *args)
     int failCount = 0;
     char ipv6[IPV6_ADDRESS_LEN] = { 0 };
     char masterIP[IPV6_ADDRESS_LEN] = { 0 };
-    char neighbor[IPV6_ADDRESS_LEN] = { 0 };
+    //char neighbor[IPV6_ADDRESS_LEN] = { 0 };
     char myIPv6[IPV6_ADDRESS_LEN] = { 0 };
     bool discovered = false;
     int i;
+    bool topoComplete = false;
 
     int numNeighbors = 0;
     char **neighbors = (char**)calloc(MAX_NEIGHBORS, sizeof(char*));
@@ -199,29 +187,34 @@ void *_udp_server(void *args)
             // information about our IP and neighbors
             } else if (strncmp(server_buffer,"ips:",4) == 0) {
                 // process IP and neighbors
-                char *msg = malloc(SERVER_BUFFER_SIZE);
-                char *mem = msg;
-                substr(server_buffer, 4, strlen(server_buffer)-4, msg);
-                extractIP(&msg,myIPv6);
-                msg_u_out.content.ptr = &myIPv6;
-                msg_u_out.type = 1;
-                msg_try_send(&msg_u_out, leaderPID);
-                printf("UDP: My IPv6 is: %s\n", myIPv6);
-                xtimer_usleep(20000); // wait 0.02 seconds
+                ipc_msg_send(server_buffer, leaderPID, false);
 
-                // extract neighbors IPs from message
-                while(strlen(msg) > 1) {
-                    char neigh[MAX_IPC_MESSAGE_SIZE] = "neighbor:";
-                    extractIP(&msg,neighbor);
-                    strcpy(neighbors[numNeighbors], neighbor);
-                    numNeighbors++;
-                    printf("UDP: Extracted neighbor %s\n", neighbor);
-                    strcat(neigh, neighbor);
-                    ipc_msg_send(neigh, leaderPID, false);
+                if (!topoComplete) {
+                    char *msg = malloc(SERVER_BUFFER_SIZE);
+                    char *mem = msg;
+                    substr(server_buffer, 4, strlen(server_buffer)-4, msg);
+                    extractIP(&msg,myIPv6);
+                    //msg_u_out.content.ptr = &myIPv6;
+                    //msg_u_out.type = 1;
+                    //msg_try_send(&msg_u_out, leaderPID);
+                    printf("UDP: My IPv6 is: %s\n", myIPv6);
                     xtimer_usleep(20000); // wait 0.02 seconds
-                }
 
-                free(mem);
+                    // extract neighbors IPs from message
+                    while(strlen(msg) > 1) {
+                        char neigh[MAX_IPC_MESSAGE_SIZE] = "neighbor:";
+                        extractIP(&msg,neighbors[numNeighbors]);
+                        //strcpy(neighbors[numNeighbors], neighbor);
+                        printf("UDP: Extracted neighbor %s\n", neighbors[numNeighbors]);
+                        strcat(neigh, neighbors[numNeighbors]);
+                        //ipc_msg_send(neigh, leaderPID, false);
+                        numNeighbors++;
+                        //xtimer_usleep(20000); // wait 0.02 seconds
+                    }
+                    
+                    topoComplete = true;
+                    free(mem);
+                }
 
             // start leader election
             } else if (strncmp(server_buffer,"start:",6) == 0) {
@@ -232,7 +225,10 @@ void *_udp_server(void *args)
             // this neighbor is sending is leader election values
             } else if (strncmp(server_buffer,"le_ack",6) == 0 || strncmp(server_buffer,"le_m?",5) == 0) {
                 // process m value things
+                //char msg[MAX_IPC_MESSAGE_SIZE];
+                //strcpy(msg, server_buffer);
                 ipc_msg_send(server_buffer, leaderPID, false);
+                //xtimer_usleep(20000); // wait 0.02 seconds
                 if (DEBUG == 1) 
                     printf("UDP: sent IPC message \"%s\" to %" PRIkernel_pid "\n", server_buffer, leaderPID);
                 
