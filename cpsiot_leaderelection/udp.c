@@ -30,7 +30,7 @@
 #define MAX_IPC_MESSAGE_SIZE    (256)
 #define MAX_NEIGHBORS           (8)
 
-#define    DEBUG     (1)
+#define DEBUG                   0
 
 // External functions defs
 extern int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking);
@@ -90,6 +90,9 @@ void *_udp_server(void *args)
     int i;
     bool topoComplete = false;
 
+    char portBuf[6];
+    sprintf(portBuf,"%d",SERVER_PORT);
+
     int numNeighbors = 0;
     char **neighbors = (char**)calloc(MAX_NEIGHBORS, sizeof(char*));
     for(i = 0; i < MAX_NEIGHBORS; i++) {
@@ -146,8 +149,9 @@ void *_udp_server(void *args)
         if ((res = sock_udp_recv(&sock, server_buffer,
                                  sizeof(server_buffer) - 1, 0.05 * US_PER_SEC, //SOCK_NO_TIMEOUT,
                                  &remote)) < 0) {
-            if(res != 0 && res != -ETIMEDOUT && res != -EAGAIN) 
+            if (res != 0 && res != -ETIMEDOUT && res != -EAGAIN) {
                 printf("UDP: Error - failed to receive UDP, %d\n", res);
+            }
         }
         else if (res == 0) {
             (void) puts("UDP: no UDP data received");
@@ -157,8 +161,9 @@ void *_udp_server(void *args)
             res = 1;
             countMsgIn();
             ipv6_addr_to_str(ipv6, (ipv6_addr_t *)&remote.addr.ipv6, IPV6_ADDRESS_LEN);
-            if (DEBUG == 1) 
+            if (DEBUG == 1) {
                 printf("UDP: recvd: %s from %s\n", server_buffer, ipv6);
+            }
         }
 
         // react to UDP message
@@ -167,13 +172,12 @@ void *_udp_server(void *args)
             if (strncmp(server_buffer,"ping",7) == 0) {
                 // acknowledge them discovering us
                 if (!discovered) { 
-                    char port[5];
-                    sprintf(port, "%d", SERVER_PORT);
                     char msg[5] = "pong";
-                    char *argsMsg[] = { "udp_send", ipv6, port, msg, NULL };
+                    char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
                     udp_send(4, argsMsg);
-                    if (DEBUG == 1) 
+                    if (DEBUG == 1) {
                         printf("UDP: sent UDP message \"%s\" to %s\n", msg, ipv6);
+                    }
                 }
 
             // the master acknowledging our acknowledgement
@@ -181,8 +185,7 @@ void *_udp_server(void *args)
                 // processes confirmation
                 discovered = true;
                 strcpy(masterIP, ipv6);
-                if (DEBUG == 1) 
-                    printf("UDP: master node (%s) confirmed us\n", masterIP);
+                printf("UDP: master node (%s) confirmed us\n", masterIP);
 
             // information about our IP and neighbors
             } else if (strncmp(server_buffer,"ips:",4) == 0) {
@@ -229,9 +232,9 @@ void *_udp_server(void *args)
                 //strcpy(msg, server_buffer);
                 ipc_msg_send(server_buffer, leaderPID, false);
                 //xtimer_usleep(20000); // wait 0.02 seconds
-                if (DEBUG == 1) 
+                if (DEBUG == 1) {
                     printf("UDP: sent IPC message \"%s\" to %" PRIkernel_pid "\n", server_buffer, leaderPID);
-                
+                }
             }
         }
 
@@ -244,8 +247,9 @@ void *_udp_server(void *args)
             if (msg_u_in.type > 0 && msg_u_in.type < MAX_IPC_MESSAGE_SIZE) {
                 // process string message of size msg_u_in.type
                 strncpy(msg_content, (char*)msg_u_in.content.ptr, (uint16_t)msg_u_in.type+1);
-                if (DEBUG == 1) 
+                if (DEBUG == 1) {
                     printf("UDP: received IPC message: %s from %" PRIkernel_pid ", type=%d\n", msg_content, msg_u_in.sender_pid, msg_u_in.type);
+                }
             } else {
                 printf("UPD: received an illegal or too large IPC message, type=%u", msg_u_in.type);
             }
@@ -257,31 +261,28 @@ void *_udp_server(void *args)
             if (strncmp(msg_content,"le_init",7) == 0) {
                 // send out m? queries
                 runningLE = true;
-                char port[5];
-                sprintf(port, "%d", SERVER_PORT);
                 char msg[7] = "le_m?:";
 
                 for(i = 0; i < numNeighbors; i++) {
-                    char *argsMsg[] = { "udp_send", neighbors[i], port, msg, NULL };
+                    char *argsMsg[] = { "udp_send", neighbors[i], portBuf, msg, NULL };
                     udp_send(4, argsMsg);
                 }
 
-                if (DEBUG == 1) 
+                if (DEBUG == 1) {
                     printf("UDP: sent UDP message \"%s\" to %d neighbors\n", msg, numNeighbors);
+                }
     
             // send out an m value acknowledgement
             } else if (strncmp(msg_content,"le_ack",6) == 0) {
                 // send out m value
-                char port[5];
-                sprintf(port, "%d", SERVER_PORT);
-
                 for(i = 0; i < numNeighbors; i++) {
-                    char *argsMsg[] = { "udp_send", neighbors[i], port, msg_content, NULL };
+                    char *argsMsg[] = { "udp_send", neighbors[i], portBuf, msg_content, NULL };
                     udp_send(4, argsMsg);
                 }
 
-                if (DEBUG == 1) 
+                if (DEBUG == 1) {
                     printf("UDP: sent UDP message \"%s\" to %d neighbors\n", msg_content, numNeighbors);
+                }
 
             // leader election complete, print network stats
             } else if (strncmp(msg_content,"le_done",7) == 0) {
@@ -292,10 +293,8 @@ void *_udp_server(void *args)
                 // IP address of master node in masterIP variable
                 // David? TODO
 
-                //char port[5];
-                //sprintf(port, "%d", SERVER_PORT);
                 //char msg[SERVER_BUFFER_SIZE] = "information...";
-                //char *argsMsg[] = { "udp_send", ipv6, port, msg, NULL };
+                //char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
                 //udp_send(4, argsMsg);
                 // ...
             }
@@ -333,8 +332,9 @@ int udp_send(int argc, char **argv)
         printf("UDP: Error - could not send message \"%s\" to %s\n", argv[3], argv[1]);
     }
     else {
-        if (DEBUG == 1) 
+        if (DEBUG == 1) {
             printf("UDP: Success - sent %u bytes to %s\n", (unsigned) res, argv[1]);
+        }
         countMsgOut();
     }
     return 0;
@@ -369,8 +369,9 @@ int udp_send_multi(int argc, char **argv)
         printf("UDP: Error - could not send message \"%s\" to %s\n", argv[2], ipv6);
     }
     else {
-        if (DEBUG == 1) 
+        if (DEBUG == 1) {
             printf("UDP: Success - sent %u bytes to %s\n", (unsigned)res, ipv6);
+        }
         countMsgOut();
     }
     return 0;
