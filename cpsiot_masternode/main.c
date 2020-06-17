@@ -40,6 +40,7 @@ extern int udp_server(int argc, char **argv);
 // Forward declarations
 static int hello_world(int argc, char **argv);
 static int run(int argc, char **argv);
+void extractIP(char **s, char *t);
 
 // Data structures (i.e. stacks, queues, message structs, etc)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
@@ -65,6 +66,20 @@ const shell_command_t shell_commands[] = {
     {"hello", "prints hello world", hello_world},
     { NULL, NULL, NULL }
 };
+
+// Purpose: write into t from s by extracting the next IP from the list also work with anydata separated by a semicolon
+//
+// s char*, source string
+// t char*, destination string
+void extractIP(char **s, char *t) 
+{
+    int in;
+    
+    in = indexOfSemi(*s);   
+    memset(t, 0, in); 
+    substr(*s, 0, in-1, t);
+    *s += in;
+}
 
 // initiates main program
 static int run(int argc, char **argv) {
