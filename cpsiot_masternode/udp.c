@@ -44,6 +44,9 @@ int udp_server(int argc, char **argv);
 int alreadyANeighbor(char **neighbors, char *ipv6);
 int getNeighborIndex(char **neighbors, char *ipv6);
 
+//External functions defs
+extern void extractIP(char **s, char *t);
+
 // Data structures (i.e. stacks, queues, message structs, etc)
 static char server_buffer[SERVER_BUFFER_SIZE];
 static char server_stack[THREAD_STACKSIZE_DEFAULT];
@@ -87,10 +90,15 @@ void *_udp_server(void *args)
     msg_init_queue(server_msg_queue, SERVER_MSG_QUEUE_SIZE);
     char msg_content[MAX_IPC_MESSAGE_SIZE];
     char ipv6[IPV6_ADDRESS_LEN] = { 0 };
+	char tempipv6[IPV6_ADDRESS_LEN] = { 0 };
+	char tempruntime[MAX_IPC_MESSAGE_SIZE] = { 0 };
+	char tempmessagecount[MAX_IPC_MESSAGE_SIZE] = { 0 };
     char portBuf[6];
     sprintf(portBuf,"%d",SERVER_PORT);
 
     int numNodes = 0;
+	int numNodesFinished = 0;
+	int finished = 0;
     int i;
     char **nodes = (char**)calloc(MAX_NODES, sizeof(char*));
     for(i = 0; i < MAX_NODES; i++) {
@@ -149,7 +157,7 @@ void *_udp_server(void *args)
         // react to UDP message
         if (res == 1) {
             // a node has responded to our discovery request
-            if (strncmp(server_buffer,"pong",7) == 0) {
+            if (strncmp(server_buffer,"pong",4) == 0) {
                 // if node with this ipv6 is already found, ignore
                 // otherwise record them
                 int found = alreadyANeighbor(nodes, ipv6);
@@ -252,15 +260,40 @@ void *_udp_server(void *args)
 
         // handle UDP message
         if (res == 1) {
-            // David? TODO
-            // react to final messages about election results, convergence, etc
-            if (strncmp(server_buffer,"something",7) == 0) {
-                
-            } else if (strncmp(server_buffer,"something",7) == 0) {
-                
-            } else if (strncmp(server_buffer,"something",7) == 0) {
-                
-            }
+			//Getting results from a node
+			//Form is "results;<elected_leader_id>;<runtime>;<message_count>;"
+			else if(strncmp(server_buffer,"results",7) == 0){
+				//If we are already done don't save results anymore
+				if(!finished){
+					//TODO Save data somehow and check for reduntant data (right now the nodes will only report thier results once)
+				
+					//Save data
+					char *msg = malloc(SERVER_BUFFER_SIZE);
+                    char *mem = msg;
+                    //chop off the results string
+					substr(server_buffer, 8, strlen(server_buffer)-8, msg);
+					
+					//Extract the elected IP
+					extractIP(&msg, tempipv6);
+					printf("Node %s elected %s as leader",ipv6,tempipv6);
+					
+					//Extract the run time
+					extractIP(&msg, tempruntime);
+					printf("Node %s finished %s milliseconds",ipv6,tempruntime);
+					
+					//Extract the message count
+					extractIP(&msg, tempmessagecount);
+					printf("Node %s finished with %s messages",ipv6,tempmessagecount);
+					
+					numNodesFinished++;
+					printf("%s nodes reported so far",numNodesFinished);
+					if(numNodesFinished => numNodes){
+						printf("All nodes have reported!");
+						finished = 1;
+					}
+				}
+				
+			}
         }
 
         xtimer_usleep(50000); // wait 0.05 seconds

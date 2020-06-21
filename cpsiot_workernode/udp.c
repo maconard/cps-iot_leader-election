@@ -80,6 +80,7 @@ void *_udp_server(void *args)
     // variable declarations
     int failCount = 0;
     char ipv6[IPV6_ADDRESS_LEN] = { 0 };
+	char tempipv6[IPV6_ADDRESS_LEN] = { 0 };
     char masterIP[IPV6_ADDRESS_LEN] = { 0 };
     char myIPv6[IPV6_ADDRESS_LEN] = { 0 };
     bool discovered = false;
@@ -304,18 +305,45 @@ void *_udp_server(void *args)
                 }
 
             // leader election complete, print network stats
-            } else if (strncmp(msg_content,"le_done",7) == 0) {
+            } else if (strncmp(msg_content,"results",7) == 0) {
                 // leader election finished!
                 printf("UDP: leader election complete, msgsIn: %d, msgsOut: %d, msgsTotal: %d\n", messagesIn, messagesOut, messagesIn + messagesOut);
 
-                // send information to the master node?
+                // send information to the master node
                 // IP address of master node in masterIP variable
-                // David? TODO
+				
+                //TODO possibly repeat report as needed. Right now results are only sent once
+				
+				char *msg = malloc(SERVER_BUFFER_SIZE);
+                char *mem = msg;
+                //chop off the results string
+				substr(server_buffer, 8, strlen(server_buffer)-8, msg);
+				
+				//Extract the elected IP
+				extractIP(&msg, tempipv6);
+				
+				char convTime[10] = { 0 };//no more the 10 chars long (for now)
+				//Extract the convergance time
+				extractIP(&msg, convTime);
+				
+				//Setup message to send to master node
+				//Form is "results;<elected_leader_id>;<runtime>;<message_count>;"
+				char msg2[SERVER_BUFFER_SIZE] = "results;";
+                
+                strcat(msg2, tempipv6);
+                strcat(msg2, ";");
+                strcat(msg2, convTime);//convTime is already a string from the other thread
+                strcat(msg2, ";");
+				
+				int totalMessages = messagesIn + messagesOut;
+				//TODO convert totalMessages to char array
+				char tempMessages[10];
+				sprintf(tempMessages , "%d" , totalMessages);
+                strcat(msg2, tempMessages);
+                strcat(msg2, ";");
 
-                //char msg[SERVER_BUFFER_SIZE] = "information...";
-                //char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
-                //udp_send(4, argsMsg);
-                // ...
+                char *argsMsg[] = { "udp_send", masterIP, portBuf, msg2, NULL };
+                udp_send(4, argsMsg);
             }
         }
 

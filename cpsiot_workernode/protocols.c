@@ -469,12 +469,15 @@ void *_leader_election(void *argv) {
 
     // if the master node needs information from this protocol thread
     // send IPC messages to the UDP thread to forward to the master node
-    // David? TODO
 
-    //char msg[MAX_IPC_MESSAGE_SIZE] = "information...";
-    //strcat(msg, "more information...");
-    //ipc_msg_send(msg, udpServerPID, false);
-    // ...
+    char msg[MAX_IPC_MESSAGE_SIZE] = "results;";
+	strcat(msg, leader);
+    strcat(msg, ";");
+	char tempTime[10];
+	sprintf(tempTime , "%.3f" , convergenceTimeLE);
+    strcat(msg, tempTime);
+    strcat(msg, ";");
+    ipc_msg_send(msg, udpServerPID, false);
 
     for(int i = 0; i < MAX_NEIGHBORS; i++) {
         free(neighbors[i]);
