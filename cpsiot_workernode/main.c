@@ -247,14 +247,11 @@ static int run(int argc, char **argv) {
 // main method
 int main(void)
 {
-    // initialize networking and packet tools
-    //gnrc_netreg_entry_t dump = GNRC_NETREG_ENTRY_INIT_PID(GNRC_NETREG_DEMUX_CTX_ALL, gnrc_pktdump_pid);
-    //gnrc_netreg_register(GNRC_NETTYPE_UNDEF, &dump);
-    msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
-
-    run(0, NULL);
-
     (void) puts("MAIN: Welcome to RIOT!");
+
+    msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
+    
+    run(0, NULL);
 
     // start the RIOT shell for this node
     char line_buf[SHELL_DEFAULT_BUFSIZE];
