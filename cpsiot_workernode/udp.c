@@ -314,7 +314,7 @@ void *_udp_server(void *args)
 				
                 //TODO possibly repeat report as needed. Right now results are only sent once
 				
-				char *msg = malloc(SERVER_BUFFER_SIZE);
+				char *msg = (char*)calloc(SERVER_BUFFER_SIZE, sizeof(char));
                 char *mem = msg;
                 //chop off the results string
 				substr(server_buffer, 8, strlen(server_buffer)-8, msg);
@@ -328,6 +328,7 @@ void *_udp_server(void *args)
 				
 				//Setup message to send to master node
 				//Form is "results;<elected_leader_id>;<runtime>;<message_count>;"
+                free(mem);
 				char msg2[SERVER_BUFFER_SIZE] = "results;";
                 
                 strcat(msg2, tempipv6);
@@ -341,7 +342,9 @@ void *_udp_server(void *args)
 				sprintf(tempMessages , "%d" , totalMessages);
                 strcat(msg2, tempMessages);
                 strcat(msg2, ";");
-
+                if (DEBUG == 1) {
+                    printf("UDP: sending results to master: %s\n", msg2);
+                }
                 char *argsMsg[] = { "udp_send", masterIP, portBuf, msg2, NULL };
                 udp_send(4, argsMsg);
             }

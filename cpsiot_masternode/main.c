@@ -29,7 +29,7 @@
 #define MAIN_QUEUE_SIZE         (64)
 #define MAX_IPC_MESSAGE_SIZE    (128)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_NODES               (20)
+#define MAX_NODES               (10)
 
 #define DEBUG                   1
 
@@ -40,7 +40,9 @@ extern int udp_server(int argc, char **argv);
 // Forward declarations
 static int hello_world(int argc, char **argv);
 static int run(int argc, char **argv);
+void substr(char *s, int a, int b, char *t);
 void extractIP(char **s, char *t);
+int indexOfSemi(char *ipv6);
 
 // Data structures (i.e. stacks, queues, message structs, etc)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
@@ -66,6 +68,30 @@ const shell_command_t shell_commands[] = {
     {"hello", "prints hello world", hello_world},
     { NULL, NULL, NULL }
 };
+
+// Purpose: find the index of a semicolon in a string for data packing
+//
+// ipv6 char*, string to check for the semicolon in
+int indexOfSemi(char *ipv6) {
+    for (uint32_t i = 0; i < strlen(ipv6); i++) {
+        if (ipv6[i]  == ';') {
+            return i+1; // start of second id
+        }
+    }
+    return -1;
+}
+
+// Purpose: write into t from s starting at index a for length b
+//
+// s char*, source string
+// t char*, destination string
+// a int, starting index in s
+// b int, length to copy from s following index a
+void substr(char *s, int a, int b, char *t) 
+{
+    memset(t, 0, b);
+    strncpy(t, s+a, b);
+}
 
 // Purpose: write into t from s by extracting the next IP from the list also work with anydata separated by a semicolon
 //

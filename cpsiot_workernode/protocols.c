@@ -125,7 +125,6 @@ kernel_pid_t leader_election(int argc, char **argv) {
 void *_leader_election(void *argv) {
     (void)argv;
     msg_init_queue(_protocol_msg_queue, MAIN_QUEUE_SIZE);
-    random_init(xtimer_now_usec()); 
 
     char msg_content[MAX_IPC_MESSAGE_SIZE];
 
@@ -171,6 +170,7 @@ void *_leader_election(void *argv) {
         neighbors[i] = (char*)calloc(IPV6_ADDRESS_LEN, sizeof(char));
     }
 
+    random_init(xtimer_now_usec64()); 
     m = (random_uint32() % 254)+1;
     min = m;
 
@@ -445,12 +445,12 @@ void *_leader_election(void *argv) {
                     }
                     //char* msg = (char*)calloc(MAX_IPC_MESSAGE_SIZE,sizeof(char));
                     //strcpy(msg, "le_done:");
-                    char msg[MAX_IPC_MESSAGE_SIZE] = "le_done:";                     
-                    ipc_msg_send(msg, udpServerPID, false);
+                    //char msg[MAX_IPC_MESSAGE_SIZE] = "le_done:";                     
+                    //ipc_msg_send(msg, udpServerPID, false);
                     //free(msg);
                     endTimeLE = xtimer_now_usec64();
                     convergenceTimeLE = ((double)(endTimeLE - startTimeLE))/1000000.0;
-                    convergenceTimeLE = ((int)(convergenceTimeLE*1000))/1000.0;
+                    convergenceTimeLE = ((double)((int)(convergenceTimeLE*1000.0)))/1000.0;
                     printf("LE: leader election took %.3f seconds to converge\n", convergenceTimeLE);
                     runningLE = false;
                     hasElectedLeader = true;
@@ -466,17 +466,22 @@ void *_leader_election(void *argv) {
         xtimer_usleep(50000); // wait 0.05 seconds
         //printf("LE: bottom\n");
     }
-
+    if (DEBUG == 1) {
+        printf("LE: quit main loop\n");
+    }
     // if the master node needs information from this protocol thread
     // send IPC messages to the UDP thread to forward to the master node
 
     char msg[MAX_IPC_MESSAGE_SIZE] = "results;";
+	char tempTime[10];
 	strcat(msg, leader);
     strcat(msg, ";");
-	char tempTime[10];
 	sprintf(tempTime , "%.3f" , convergenceTimeLE);
     strcat(msg, tempTime);
     strcat(msg, ";");
+    if (DEBUG == 1) {
+        printf("LE: sending results: %s\n", msg);
+    }
     ipc_msg_send(msg, udpServerPID, false);
 
     for(int i = 0; i < MAX_NEIGHBORS; i++) {

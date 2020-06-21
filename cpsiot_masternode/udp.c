@@ -29,7 +29,7 @@
 #define IPV6_ADDRESS_LEN        (46)
 #define MAX_IPC_MESSAGE_SIZE    (128)
 
-#define MAX_NODES               (20)
+#define MAX_NODES               (10)
 
 // 1=ring, 2=line, grid, mesh
 #define MY_TOPO                 (1)
@@ -45,6 +45,8 @@ int alreadyANeighbor(char **neighbors, char *ipv6);
 int getNeighborIndex(char **neighbors, char *ipv6);
 
 //External functions defs
+extern void substr(char *s, int a, int b, char *t);
+extern int indexOfSemi(char *ipv6);
 extern void extractIP(char **s, char *t);
 
 // Data structures (i.e. stacks, queues, message structs, etc)
@@ -244,8 +246,9 @@ void *_udp_server(void *args)
         if ((res = sock_udp_recv(&sock, server_buffer,
                                  sizeof(server_buffer) - 1, 0.05 * US_PER_SEC, //SOCK_NO_TIMEOUT,
                                  &remote)) < 0) {
-            if(res != 0 && res != -ETIMEDOUT && res != -EAGAIN) 
+            if(res != 0 && res != -ETIMEDOUT && res != -EAGAIN)  {
                 printf("UDP: Error - failed to receive UDP, %d\n", res);
+            }
         }
         else if (res == 0) {
             (void) puts("UDP: no UDP data received");
@@ -254,43 +257,45 @@ void *_udp_server(void *args)
             server_buffer[res] = '\0';
             res = 1;
             ipv6_addr_to_str(ipv6, (ipv6_addr_t *)&remote.addr.ipv6, IPV6_ADDRESS_LEN);
-            if (DEBUG == 1) 
+            if (DEBUG == 1) {
                 printf("UDP: recvd: %s from %s\n", server_buffer, ipv6);
+            }
         }
 
         // handle UDP message
         if (res == 1) {
 			//Getting results from a node
 			//Form is "results;<elected_leader_id>;<runtime>;<message_count>;"
-			else if(strncmp(server_buffer,"results",7) == 0){
+			if (strncmp(server_buffer,"results",7) == 0) {
 				//If we are already done don't save results anymore
-				if(!finished){
+				if (!finished) {
 					//TODO Save data somehow and check for reduntant data (right now the nodes will only report thier results once)
 				
 					//Save data
-					char *msg = malloc(SERVER_BUFFER_SIZE);
+					char *msg = (char*)calloc(SERVER_BUFFER_SIZE, sizeof(char));
                     char *mem = msg;
                     //chop off the results string
 					substr(server_buffer, 8, strlen(server_buffer)-8, msg);
 					
 					//Extract the elected IP
 					extractIP(&msg, tempipv6);
-					printf("Node %s elected %s as leader",ipv6,tempipv6);
+					printf("UDP: Node %s elected %s as leader",ipv6,tempipv6);
 					
 					//Extract the run time
 					extractIP(&msg, tempruntime);
-					printf("Node %s finished %s milliseconds",ipv6,tempruntime);
+					printf("UDP: Node %s finished %s milliseconds",ipv6,tempruntime);
 					
 					//Extract the message count
 					extractIP(&msg, tempmessagecount);
-					printf("Node %s finished with %s messages",ipv6,tempmessagecount);
+					printf("UDP: Node %s finished with %s messages",ipv6,tempmessagecount);
 					
 					numNodesFinished++;
-					printf("%s nodes reported so far",numNodesFinished);
-					if(numNodesFinished => numNodes){
-						printf("All nodes have reported!");
+					printf("UDP: %d nodes reported so far",numNodesFinished);
+					if(numNodesFinished >= numNodes){
+						printf("UDP: All nodes have reported!");
 						finished = 1;
 					}
+                    free(mem);
 				}
 				
 			}
