@@ -30,7 +30,7 @@
 #define MAX_IPC_MESSAGE_SIZE    (128)
 #define MAX_NEIGHBORS           (8)
 
-#define DEBUG                   1
+#define DEBUG                   0
 
 // External functions defs
 extern int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking);
@@ -78,14 +78,18 @@ void *_udp_server(void *args)
     msg_init_queue(server_msg_queue, SERVER_MSG_QUEUE_SIZE);
 
     // variable declarations
-    int failCount = 0;
     char ipv6[IPV6_ADDRESS_LEN] = { 0 };
 	char tempipv6[IPV6_ADDRESS_LEN] = { 0 };
     char masterIP[IPV6_ADDRESS_LEN] = { 0 };
     char myIPv6[IPV6_ADDRESS_LEN] = { 0 };
+	char convTime[10] = { 0 };
+    char mStr[4] = { 0 };
+    int failCount = 0;
     bool discovered = false;
     int i;
     bool topoComplete = false;
+    int m;
+    int rconf = 0; // did master confirm results received
 
     char msg_content[MAX_IPC_MESSAGE_SIZE];
     char portBuf[6];
@@ -193,6 +197,8 @@ void *_udp_server(void *args)
                     char msg[5] = "pong";
                     char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
                     udp_send(4, argsMsg);
+                    strcpy(masterIP, ipv6);
+                    printf("UDP: discovery attempt from master node (%s)\n", masterIP);
                     if (DEBUG == 1) {
                         printf("UDP: sent UDP message \"%s\" to %s\n", msg, ipv6);
                     }
@@ -220,8 +226,11 @@ void *_udp_server(void *args)
                         printf("UDP: msg = %s\n", msg);
                     }
 
+                    extractIP(&msg,mStr);
+                    m = atoi(mStr);
+
                     extractIP(&msg,myIPv6);
-                    printf("UDP: My IPv6 is: %s\n", myIPv6);
+                    printf("UDP: My IPv6 is: %s, m=%d\n", myIPv6, m);
 
                     if (DEBUG == 1) {
                         printf("UDP: before extract while loop\n");
@@ -250,12 +259,18 @@ void *_udp_server(void *args)
                 runningLE = true;
                 ipc_msg_send(server_buffer, leaderPID, false);
 
-            // this neighbor is sending is leader election values
+            // this neighbor is sending us leader election values
             } else if (strncmp(server_buffer,"le_ack",6) == 0 || strncmp(server_buffer,"le_m?",5) == 0) {
                 // process m value things
                 ipc_msg_send(server_buffer, leaderPID, false);
                 if (DEBUG == 1) {
                     printf("UDP: sent IPC message \"%s\" to %" PRIkernel_pid "\n", server_buffer, leaderPID);
+                }
+            } else if (strncmp(server_buffer,"rconf",5) == 0) {
+                // process m value things
+                rconf = 1;
+                if (DEBUG == 1) {
+                    printf("UDP: master confirmed results");
                 }
             }
         }
@@ -286,6 +301,7 @@ void *_udp_server(void *args)
                 for(i = 0; i < numNeighbors; i++) {
                     char *argsMsg[] = { "udp_send", neighbors[i], portBuf, msg, NULL };
                     udp_send(4, argsMsg);
+                    xtimer_usleep(10000); // wait 0.01 seconds
                 }
 
                 if (DEBUG == 1) {
@@ -298,6 +314,7 @@ void *_udp_server(void *args)
                 for(i = 0; i < numNeighbors; i++) {
                     char *argsMsg[] = { "udp_send", neighbors[i], portBuf, msg_content, NULL };
                     udp_send(4, argsMsg);
+                    xtimer_usleep(10000); // wait 0.01 seconds
                 }
 
                 if (DEBUG == 1) {
@@ -305,31 +322,37 @@ void *_udp_server(void *args)
                 }
 
             // leader election complete, print network stats
-            } else if (strncmp(msg_content,"results",7) == 0) {
+            } else if (strncmp(msg_content,"results",7) == 0 && rconf == 0) {
                 // leader election finished!
                 printf("UDP: leader election complete, msgsIn: %d, msgsOut: %d, msgsTotal: %d\n", messagesIn, messagesOut, messagesIn + messagesOut);
 
                 // send information to the master node
-                // IP address of master node in masterIP variable
-				
-                //TODO possibly repeat report as needed. Right now results are only sent once
-				
-				char *msg = (char*)calloc(SERVER_BUFFER_SIZE, sizeof(char));
+				char *msg = (char*)malloc(SERVER_BUFFER_SIZE);
+                memset(msg, 0, SERVER_BUFFER_SIZE);
                 char *mem = msg;
+
                 //chop off the results string
-				substr(server_buffer, 8, strlen(server_buffer)-8, msg);
-				
+				substr(msg_content, 8, strlen(msg_content)-8, msg);
+                if (DEBUG == 1) {
+                    printf("UDP: results body: %s\n", msg);
+                }
+
 				//Extract the elected IP
 				extractIP(&msg, tempipv6);
-				
-				char convTime[10] = { 0 };//no more the 10 chars long (for now)
+                if (DEBUG == 1) {
+                    printf("UDP: extracted leader %s\n", tempipv6);
+                }
+
 				//Extract the convergance time
 				extractIP(&msg, convTime);
-				
+                if (DEBUG == 1) {
+                    printf("UDP: extracted convergence time: %s\n", convTime);
+                }
+
 				//Setup message to send to master node
 				//Form is "results;<elected_leader_id>;<runtime>;<message_count>;"
                 free(mem);
-				char msg2[SERVER_BUFFER_SIZE] = "results;";
+				char msg2[SERVER_BUFFER_SIZE] = "results:";
                 
                 strcat(msg2, tempipv6);
                 strcat(msg2, ";");
@@ -347,6 +370,7 @@ void *_udp_server(void *args)
                 }
                 char *argsMsg[] = { "udp_send", masterIP, portBuf, msg2, NULL };
                 udp_send(4, argsMsg);
+                xtimer_usleep(1500000); // wait 1.5 seconds
             }
         }
 

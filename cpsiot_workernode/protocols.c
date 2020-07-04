@@ -17,7 +17,6 @@
 // Standard RIOT includes
 #include "thread.h"
 #include "xtimer.h"
-#include "random.h"
 
 #define CHANNEL                 11
 
@@ -26,12 +25,12 @@
 #define IPV6_ADDRESS_LEN        (46)
 #define MAX_NEIGHBORS           (8)
 
-#define DEBUG                   1
+#define DEBUG                   0
 
 // Leader Election values
 #define K     (5)
-#define T1    (5*1000000)
-#define T2    (3*1000000)
+#define T1    (6*1000000)
+#define T2    (4*1000000)
 
 // External functions defs
 extern int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking);
@@ -135,9 +134,9 @@ void *_leader_election(void *argv) {
     char initLE[8] = "le_init";
     char neighborM[4] = { 0 };
 
-    uint64_t startTimeLE = 0;
-    uint64_t endTimeLE = 0;
-    double convergenceTimeLE = 0;
+    uint32_t startTimeLE = 0;
+    uint32_t endTimeLE = 0;
+    uint32_t convergenceTimeLE = 0;
     bool hasElectedLeader = false;
     bool runningLE = false;
     bool allowLE = false;
@@ -152,10 +151,10 @@ void *_leader_election(void *argv) {
     uint32_t tempMin = 257;
     char leader[IPV6_ADDRESS_LEN] = "unknown";    // the "leader so far"
     char tempLeader[IPV6_ADDRESS_LEN];    // temp leader for a round of communication
-    uint64_t t1 = T1;
-    uint64_t t2 = T2;
-    uint64_t lastT1 = 0;
-    uint64_t lastT2 = 0;
+    uint32_t t1 = T1;
+    uint32_t t2 = T2;
+    uint32_t lastT1 = 0;
+    uint32_t lastT2 = 0;
     bool topoComplete = false;
 
     int res = 0;
@@ -170,8 +169,7 @@ void *_leader_election(void *argv) {
         neighbors[i] = (char*)calloc(IPV6_ADDRESS_LEN, sizeof(char));
     }
 
-    random_init(xtimer_now_usec64()); 
-    m = (random_uint32() % 254)+1;
+    m = 257;
     min = m;
 
     printf("LE: Success - started protocol thread with m=%"PRIu32"\n", m);
@@ -191,6 +189,15 @@ void *_leader_election(void *argv) {
                 if (DEBUG == 1) {
                     printf("LE: Protocol thread recorded %" PRIkernel_pid " as the UDP server thread's PID\n", udpServerPID);
                 }
+                continue;
+
+            } else if (msg_p_in.type == 1) { // receive m value
+
+                if (DEBUG == 1) {
+                    printf("LE: in type==1 block, content=%s\n", (char*)msg_p_in.content.ptr);
+                }
+                m = atoi((char*)msg_p_in.content.ptr);
+                min = m;
                 continue;
 
             } else if (msg_p_in.type == 2) { // report about the leader
@@ -225,6 +232,12 @@ void *_leader_election(void *argv) {
                     char *msg = (char*)calloc(MAX_IPC_MESSAGE_SIZE, sizeof(char));
                     char *mem = msg;
                     substr(msg_content, 4, strlen(msg_content)-4, msg);
+
+                    extractIP(&msg,neighborM);
+                    m = atoi(neighborM);
+                    min = m;
+                    printf("LE: Protocol thread recorded %"PRIu32" as it's m value\n", m);
+
                     extractIP(&msg,myIPv6);
                     strcpy(leader, myIPv6);
                     printf("LE: Protocol thread recorded %s as it's IPv6\n", leader);
@@ -338,7 +351,7 @@ void *_leader_election(void *argv) {
                 (void) puts("LE: Starting leader election...");
                 runningLE = true;
                 allowLE = false;
-                startTimeLE = xtimer_now_usec64();
+                startTimeLE = xtimer_now_usec();
                 counter = K;
                 stateLE = 0;
             }
@@ -351,14 +364,14 @@ void *_leader_election(void *argv) {
                     ipc_msg_send(initLE, udpServerPID, false);
                     stateLE = 1;
                     countedMs = 0;
-                    lastT2 = xtimer_now_usec64();
+                    lastT2 = xtimer_now_usec();
             } else if (stateLE == 1) { // case 1: line 4 of psuedocode
-                    if (countedMs == numNeighbors || lastT2 < xtimer_now_usec64() - t2) {
+                    if (countedMs == numNeighbors || lastT2 < xtimer_now_usec() - t2) {
                         if (DEBUG == 1) {
                             printf("LE: case 1, tempMin=%"PRIu32", min=%"PRIu32", heard from %d neighbors\n", tempMin, min, countedMs);
                         }
                         stateLE = 2;
-                        lastT2 = xtimer_now_usec64();
+                        lastT2 = xtimer_now_usec();
                         tempMin = 257;
                         countedMs = 0;
                         for (i = 0; i < numNeighbors; i++) {
@@ -366,17 +379,17 @@ void *_leader_election(void *argv) {
                         }
                     }
             } else if (stateLE == 2) { // case 2: line 5 of pseudocode
-                    if (lastT1 < xtimer_now_usec64() - t1) {
+                    if (lastT1 < xtimer_now_usec() - t1) {
                         if (DEBUG == 1) {
                             printf("LE: case 2, tempMin=%"PRIu32", min=%"PRIu32", counter==%d\n", tempMin, min, counter);
                         }
                         stateLE = 3;
-                        lastT2 = xtimer_now_usec64();
-                        lastT1 = xtimer_now_usec64();
+                        lastT2 = xtimer_now_usec();
+                        lastT1 = xtimer_now_usec();
                     }
             } else if (stateLE == 3) { // case 3: lines 5a-f of pseudocode, some contained in response above
                     //countedMs == numNeighbors || 
-                    if (lastT2 < xtimer_now_usec64() - t2) {
+                    if (lastT2 < xtimer_now_usec() - t2) {
                         //char *msg;
 
                         if (DEBUG == 1) {
@@ -435,7 +448,7 @@ void *_leader_election(void *argv) {
                     }
 
                     // go back to line 5 of pseudocode
-                    //if (lastT1 < xtimer_now_usec64() - t1) {
+                    //if (lastT1 < xtimer_now_usec() - t1) {
                     //    stateLE = 2;
                     //}
             } else if (stateLE == 5) {
@@ -448,10 +461,12 @@ void *_leader_election(void *argv) {
                     //char msg[MAX_IPC_MESSAGE_SIZE] = "le_done:";                     
                     //ipc_msg_send(msg, udpServerPID, false);
                     //free(msg);
-                    endTimeLE = xtimer_now_usec64();
-                    convergenceTimeLE = ((double)(endTimeLE - startTimeLE))/1000000.0;
-                    convergenceTimeLE = ((double)((int)(convergenceTimeLE*1000.0)))/1000.0;
-                    printf("LE: leader election took %.3f seconds to converge\n", convergenceTimeLE);
+                    endTimeLE = xtimer_now_usec();
+                    convergenceTimeLE = (endTimeLE - startTimeLE);
+                    printf("LE:    start=%"PRIu32"\n", startTimeLE);
+                    printf("LE:      end=%"PRIu32"\n", endTimeLE);
+                    printf("LE: converge=%"PRIu32"\n", convergenceTimeLE);
+                    //printf("LE: leader election took %.3f seconds to converge\n", convergenceTimeLE);
                     runningLE = false;
                     hasElectedLeader = true;
                     countedMs = 0;
@@ -476,7 +491,7 @@ void *_leader_election(void *argv) {
 	char tempTime[10];
 	strcat(msg, leader);
     strcat(msg, ";");
-	sprintf(tempTime , "%.3f" , convergenceTimeLE);
+	sprintf(tempTime , "%"PRIu32 , convergenceTimeLE);
     strcat(msg, tempTime);
     strcat(msg, ";");
     if (DEBUG == 1) {

@@ -17,6 +17,7 @@
 // Standard RIOT includes
 #include "thread.h"
 #include "xtimer.h"
+#include "random.h"
 
 // Networking includes
 #include "net/sock/udp.h"
@@ -34,7 +35,7 @@
 // 1=ring, 2=line, grid, mesh
 #define MY_TOPO                 (1)
 
-#define DEBUG                   1
+#define DEBUG                   0
 
 // Forward declarations
 void *_udp_server(void *args);
@@ -95,6 +96,9 @@ void *_udp_server(void *args)
 	char tempipv6[IPV6_ADDRESS_LEN] = { 0 };
 	char tempruntime[MAX_IPC_MESSAGE_SIZE] = { 0 };
 	char tempmessagecount[MAX_IPC_MESSAGE_SIZE] = { 0 };
+    int m_values[MAX_NODES] = { 0 };
+    int confirmed[MAX_NODES] = { 0 };
+    char mStr[5] = { 0 };
     char portBuf[6];
     sprintf(portBuf,"%d",SERVER_PORT);
 
@@ -167,6 +171,7 @@ void *_udp_server(void *args)
                 if (found == 0) {
                     strcpy(nodes[numNodes], ipv6);
                     printf("UDP: recorded new node, %s\n", nodes[numNodes]);
+                    m_values[numNodes] = (random_uint32() % 254)+1;
                     numNodes++;
                 
                     // send back discovery confirmation
@@ -185,7 +190,7 @@ void *_udp_server(void *args)
     for (i = 0; i < MAX_NODES; i++) {
         if (strcmp(nodes[i],"") == 0) 
             continue;
-        printf("%2d: %s\n", c, nodes[i]);
+        printf("%2d: %s, m=%d\n", c, nodes[i], m_values[i]);
         c += 1;
     }
 
@@ -206,7 +211,10 @@ void *_udp_server(void *args)
                     printf("UDP: node %d's neighbors are %d and %d\n", i, pre, post);
                 }
                 char msg[SERVER_BUFFER_SIZE] = "ips:";
+                memset(mStr, 0, 5);
+                sprintf(mStr, "%d;", m_values[i]);
                 
+                strcat(msg, mStr);
                 strcat(msg, nodes[i]);
                 strcat(msg, ";");
                 strcat(msg, nodes[pre]);
@@ -270,29 +278,40 @@ void *_udp_server(void *args)
 				//If we are already done don't save results anymore
 				if (!finished) {
 					//TODO Save data somehow and check for reduntant data (right now the nodes will only report thier results once)
+                    char conf[6] = "rconf";
+                    char *argsMsg[] = { "udp_send", ipv6, portBuf, conf, NULL };
+                    udp_send(4, argsMsg);
+
+                    int index = getNeighborIndex(nodes,ipv6);
+                    if (confirmed[index] == 1) {
+                        printf("UDP: node %s was already confirmed\n", ipv6);
+                        continue;
+                    }
 				
 					//Save data
-					char *msg = (char*)calloc(SERVER_BUFFER_SIZE, sizeof(char));
+					char *msg = (char*)malloc(SERVER_BUFFER_SIZE);
+                    memset(msg, 0, SERVER_BUFFER_SIZE);
                     char *mem = msg;
                     //chop off the results string
 					substr(server_buffer, 8, strlen(server_buffer)-8, msg);
 					
 					//Extract the elected IP
 					extractIP(&msg, tempipv6);
-					printf("UDP: Node %s elected %s as leader",ipv6,tempipv6);
+					printf("UDP: Node %s elected %s as leader\n",ipv6,tempipv6);
 					
 					//Extract the run time
 					extractIP(&msg, tempruntime);
-					printf("UDP: Node %s finished %s milliseconds",ipv6,tempruntime);
+					printf("UDP: Node %s finished in %s microseconds\n",ipv6,tempruntime);
 					
 					//Extract the message count
 					extractIP(&msg, tempmessagecount);
-					printf("UDP: Node %s finished with %s messages",ipv6,tempmessagecount);
+					printf("UDP: Node %s exchanged %s messages\n",ipv6,tempmessagecount);
 					
+                    confirmed[index] = 1; // results confirmed
 					numNodesFinished++;
-					printf("UDP: %d nodes reported so far",numNodesFinished);
+					printf("UDP: %d nodes reported so far\n",numNodesFinished);
 					if(numNodesFinished >= numNodes){
-						printf("UDP: All nodes have reported!");
+						printf("\nUDP: All nodes have reported!\n");
 						finished = 1;
 					}
                     free(mem);
@@ -303,6 +322,11 @@ void *_udp_server(void *args)
 
         xtimer_usleep(50000); // wait 0.05 seconds
     }
+
+    for(i = 0; i < MAX_NODES; i++) {
+        free(nodes[i]);
+    }
+    free(nodes);
 
     return NULL;
 }

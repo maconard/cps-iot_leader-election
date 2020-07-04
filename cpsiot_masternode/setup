@@ -4,10 +4,10 @@
 // This script will cleanup your last RIOT instance AND launch
 // a new one
 
-TOPO=bi-ring4
-PROJ=my_project
+TOPO=bi-ring5
 
-./${TOPO}_cleanup.sh ${PROJ}
+./${TOPO}_cleanup.sh worker_node
+./${TOPO}_cleanup.sh master_node
 
 make all
 
