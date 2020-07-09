@@ -54,10 +54,12 @@ if [[ "$TYPE" == "master" ]]; then
     cp "../cpsiot_masternode/bin/${BOARD}/master_node.elf" "$TARGET"
     echo "Saved the master binary $FILE."
 else
+    T1us=`echo $T1 \* 1000000.0 | bc -l`
+    T2us=`echo $T2 \* 1000000.0 | bc -l`
+    T1="${T1//./_}"
+    T2="${T2//./_}"
     FILE="worker_${BOARD}_${PARAM}-${T1}-${T2}.elf"
     TARGET="./${BOARD}/${TYPE}/$FILE"
-    T1us=$(expr $T1 \* 1000000)
-    T2us=$(expr $T2 \* 1000000)
 
     echo "Compiling $FILE..."
     pushd ../cpsiot_workernode > /dev/null
