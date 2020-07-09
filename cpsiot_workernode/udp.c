@@ -24,11 +24,11 @@
 
 #define CHANNEL                 11
 
-#define SERVER_MSG_QUEUE_SIZE   (32)
+#define SERVER_MSG_QUEUE_SIZE   (16)
 #define SERVER_BUFFER_SIZE      (128)
-#define IPV6_ADDRESS_LEN        (46)
+#define IPV6_ADDRESS_LEN        (30)
 #define MAX_IPC_MESSAGE_SIZE    (128)
-#define MAX_NEIGHBORS           (8)
+#define MAX_NEIGHBORS           (6)
 
 #define DEBUG                   0
 
@@ -82,6 +82,7 @@ void *_udp_server(void *args)
 	char tempipv6[IPV6_ADDRESS_LEN] = { 0 };
     char masterIP[IPV6_ADDRESS_LEN] = { 0 };
     char myIPv6[IPV6_ADDRESS_LEN] = { 0 };
+	char startTime[10] = { 0 };
 	char convTime[10] = { 0 };
     char mStr[4] = { 0 };
     int failCount = 0;
@@ -270,7 +271,7 @@ void *_udp_server(void *args)
                 // process m value things
                 rconf = 1;
                 if (DEBUG == 1) {
-                    printf("UDP: master confirmed results");
+                    printf("UDP: master confirmed results\n");
                 }
             }
         }
@@ -325,6 +326,7 @@ void *_udp_server(void *args)
             } else if (strncmp(msg_content,"results",7) == 0 && rconf == 0) {
                 // leader election finished!
                 printf("UDP: leader election complete, msgsIn: %d, msgsOut: %d, msgsTotal: %d\n", messagesIn, messagesOut, messagesIn + messagesOut);
+                runningLE = false;
 
                 // send information to the master node
 				char *msg = (char*)malloc(SERVER_BUFFER_SIZE);
@@ -343,6 +345,12 @@ void *_udp_server(void *args)
                     printf("UDP: extracted leader %s\n", tempipv6);
                 }
 
+				//Extract the start time
+				extractIP(&msg, startTime);
+                if (DEBUG == 1) {
+                    printf("UDP: extracted convergence time: %s\n", startTime);
+                }
+
 				//Extract the convergance time
 				extractIP(&msg, convTime);
                 if (DEBUG == 1) {
@@ -355,6 +363,8 @@ void *_udp_server(void *args)
 				char msg2[SERVER_BUFFER_SIZE] = "results:";
                 
                 strcat(msg2, tempipv6);
+                strcat(msg2, ";");
+                strcat(msg2, startTime);
                 strcat(msg2, ";");
                 strcat(msg2, convTime);//convTime is already a string from the other thread
                 strcat(msg2, ";");

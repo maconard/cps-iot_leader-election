@@ -26,10 +26,10 @@
 
 #define CHANNEL                 11
 
-#define MAIN_QUEUE_SIZE         (64)
-#define MAX_IPC_MESSAGE_SIZE    (128)
+#define MAIN_QUEUE_SIZE         (4)
+#define MAX_IPC_MESSAGE_SIZE    (64)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_NODES               (10)
+#define MAX_NODES               (20)
 
 #define DEBUG                   1
 
@@ -146,7 +146,7 @@ int main(void)
     (void) puts("MAIN: Welcome to RIOT!");
 
 
-    printf("MAIN: starting master node");
+    printf("MAIN: starting master node\n");
 
     // start the RIOT shell for this node
     char line_buf[SHELL_DEFAULT_BUFSIZE];
