@@ -42,7 +42,7 @@ extern int ipc_msg_reply(char *message, msg_t incoming);
 extern int ipc_msg_send_receive(char *message, kernel_pid_t destinationPID, msg_t *response, uint16_t type);
 extern void substr(char *s, int a, int b, char *t);
 extern int indexOfSemi(char *ipv6);
-extern void extractIP(char **s, char *t);
+extern void extractMsgSegment(char **s, char *t);
 
 // Forward declarations
 void *_udp_server(void *args);
@@ -132,15 +132,15 @@ void *_udp_server(void *args)
 
     // IPv6 address variables
     char IPv6_1[IPV6_ADDRESS_LEN] = { 0 };              // holder for an address
-	char IPv6_2[IPV6_ADDRESS_LEN] = { 0 };              // holder for an address
+    char IPv6_2[IPV6_ADDRESS_LEN] = { 0 };              // holder for an address
     char masterIPv6[IPV6_ADDRESS_LEN] = "unknown";      // address of master node
     char myIPv6[IPV6_ADDRESS_LEN] = "unknown";          // my address
     char leaderIPv6[IPV6_ADDRESS_LEN] = "unknown";      // the "leader so far"
     char tempLeaderIPv6[IPV6_ADDRESS_LEN] = "unknown";  // leader of the round
 
     // other string representation variables
-	char startTime[10] = { 0 }; // string rep of algorithm start (microsec)
-	char convTime[10] = { 0 };  // string rep of convergence time (microsec)
+    char startTime[10] = { 0 }; // string rep of algorithm start (microsec)
+    char convTime[10] = { 0 };  // string rep of convergence time (microsec)
     char portBuf[6] = { 0 };    // string rep of server port
     char codeBuf[10] = { 0 };   // junk array for message headers
     char mStr[4] = { 0 };       // string rep of a 3 digit value
@@ -208,8 +208,8 @@ void *_udp_server(void *args)
         }
 
         if ((res = sock_udp_recv(&my_sock, server_buffer,
-                                 sizeof(server_buffer) - 1, 0.03 * US_PER_SEC, //SOCK_NO_TIMEOUT,
-                                 &remote)) < 0) {
+                 sizeof(server_buffer) - 1, 0.03 * US_PER_SEC, //SOCK_NO_TIMEOUT,
+                 &remote)) < 0) {
             if (res != 0 && res != -ETIMEDOUT && res != -EAGAIN) {
                 printf("WARN: failed to receive UDP, %d\n", res);
             }
@@ -258,17 +258,17 @@ void *_udp_server(void *args)
                         printf("UDP: ips = %s\n", mem);
                     }
 
-                    extractIP(&mem,codeBuf);
-                    extractIP(&mem,mStr);   // extract my m value
+                    extractMsgSegment(&mem,codeBuf);
+                    extractMsgSegment(&mem,mStr);   // extract my m value
                     m = atoi(mStr);         // convert to integer
                     min = m;                // I am the starting min
 
-                    extractIP(&mem,myIPv6);     // extract my IP
+                    extractMsgSegment(&mem,myIPv6);     // extract my IP
                     strcpy(leaderIPv6, myIPv6); // I am the starting leader
 
                     // extract neighbors IPs from message
                     while(strlen(mem) > 1) {
-                        extractIP(&mem,neighbors[numNeighbors]);
+                        extractMsgSegment(&mem,neighbors[numNeighbors]);
                         numNeighbors++;
                     }
                     
@@ -308,9 +308,9 @@ void *_udp_server(void *args)
                 char *mem = msgP;
                 uint32_t localM;
 
-                extractIP(&mem,codeBuf);    // remove header
-                extractIP(&mem,mStr);       // get m value
-                extractIP(&mem,IPv6_2);     // obtain owner ID
+                extractMsgSegment(&mem,codeBuf);    // remove header
+                extractMsgSegment(&mem,mStr);       // get m value
+                extractMsgSegment(&mem,IPv6_2);     // obtain owner ID
                 i = getNeighborIndex(neighbors, IPv6_1);  // check the sender/neighbor
 
                 if (i < 0) {
@@ -497,17 +497,17 @@ void *_udp_server(void *args)
                 stateLE = 0;
 
                 strcpy(msg, "results;");
-	            strcat(msg, leaderIPv6);
+                strcat(msg, leaderIPv6);
                 strcat(msg, ";");
-	            sprintf(startTime , "%"PRIu32 , startTimeLE);
+                sprintf(startTime , "%"PRIu32 , startTimeLE);
                 strcat(msg, startTime);
                 strcat(msg, ";");
-	            sprintf(convTime , "%"PRIu32 , convergenceTimeLE);
+                sprintf(convTime , "%"PRIu32 , convergenceTimeLE);
                 strcat(msg, convTime);
                 strcat(msg, ";");
 
                 int tMsgs = messagesIn + messagesOut;
-				sprintf(messages, "%d" , tMsgs);
+                sprintf(messages, "%d" , tMsgs);
                 strcat(msg, messages);
                 strcat(msg, ";");
 

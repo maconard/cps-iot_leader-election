@@ -44,7 +44,7 @@ int ipc_msg_send_receive(char *message, kernel_pid_t destinationPID, msg_t *resp
 int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking);
 int ipc_msg_reply(char *message, msg_t incoming);
 void substr(char *s, int a, int b, char *t);
-void extractIP(char **s, char *t);
+void extractMsgSegment(char **s, char *t);
 int indexOfSemi(char *ipv6);
 
 // Data structures (i.e. stacks, queues, message structs, etc)
@@ -90,7 +90,7 @@ int indexOfSemi(char *ipv6) {
 //
 // s char*, source string
 // t char*, destination string
-void extractIP(char **s, char *t) 
+void extractMsgSegment(char **s, char *t) 
 {
     int in;
     

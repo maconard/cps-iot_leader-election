@@ -41,7 +41,7 @@ extern int udp_server(int argc, char **argv);
 static int hello_world(int argc, char **argv);
 static int run(int argc, char **argv);
 void substr(char *s, int a, int b, char *t);
-void extractIP(char **s, char *t);
+void extractMsgSegment(char **s, char *t);
 int indexOfSemi(char *ipv6);
 
 // Data structures (i.e. stacks, queues, message structs, etc)
@@ -97,7 +97,7 @@ void substr(char *s, int a, int b, char *t)
 //
 // s char*, source string
 // t char*, destination string
-void extractIP(char **s, char *t) 
+void extractMsgSegment(char **s, char *t) 
 {
     int in;
     
