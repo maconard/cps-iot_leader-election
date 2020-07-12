@@ -1,15 +1,15 @@
 #!/bin/bash
 
-// Manually edit the TOPO and PROJ names to reflect your project
-// This script will cleanup your last RIOT instance AND launch
-// a new one
+# Manually edit the TOPO and PROJ names to reflect your project
+# This script will cleanup your last RIOT instance AND launch
+# a new one
 
 TOPO=bi-ring5
 
 ./${TOPO}_cleanup.sh worker_node
 ./${TOPO}_cleanup.sh master_node
 
-make all
+#make all
 
 ./riot define ${TOPO}
 ./riot start ${TOPO}
