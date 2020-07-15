@@ -43,7 +43,7 @@
 
 #define MY_TOPO                 STR(LE_TOPO)
 
-#define DEBUG                   1
+#define DEBUG                   0
 
 // Forward declarations
 void *_udp_server(void *args);
@@ -144,8 +144,8 @@ void *_udp_server(void *args)
     char *msgP = (char*)calloc(SERVER_BUFFER_SIZE, sizeof(char));
 
     uint32_t lastDiscover = 0;
-    uint32_t wait = 4*1000000; // 4 seconds
-    int discoverLoops = 5; // 20 seconds of discovery
+    uint32_t wait = 3*1000000; // 3 seconds
+    int discoverLoops = 2; // 6 seconds of discovery
 
     // create the socket
     if(sock_udp_create(&sock, &server, NULL, 0) < 0) {
@@ -231,12 +231,13 @@ void *_udp_server(void *args)
         xtimer_usleep(50000); // wait 0.05 seconds
     }
 
-    printf("Node discovery complete, found %d nodes:\n",numNodes);
+    printf("\nNode discovery complete, found %d nodes:\n",numNodes);
     for (i = 0; i < MAX_NODES; i++) {
         if (strcmp(nodes[i],"") == 0) 
             continue;
         printf("%2d: %s, m=%d\n", i, nodes[i], m_values[i]);
     }
+    printf("\n");
 
     memset(msg, 0, MAX_IPC_MESSAGE_SIZE);
     memset(msgP, 0, MAX_IPC_MESSAGE_SIZE);
@@ -263,8 +264,8 @@ void *_udp_server(void *args)
                 strcpy(msg, "ips;");
                 memset(mStr, 0, 5);
                 sprintf(mStr, "%d;", m_values[i]);
-                
                 strcat(msg, mStr);
+
                 strcat(msg, nodes[i]);
                 strcat(msg, ";");
                 strcat(msg, nodes[pre]);
@@ -278,9 +279,9 @@ void *_udp_server(void *args)
 
                 char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
                 udp_send(4, argsMsg);
-                xtimer_usleep(100000); // wait .1 seconds
+                xtimer_usleep(1000); // wait .001 seconds
             }
-            xtimer_usleep(1000000); // wait 1 seconds
+            xtimer_usleep(500000); // wait 0.5 seconds
         }
         printf("UDP:");
         for (i = 0; i < numNodes; i++) {
@@ -332,9 +333,9 @@ void *_udp_server(void *args)
 
                 char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
                 udp_send(4, argsMsg);
-                xtimer_usleep(100000); // wait .1 seconds
+                xtimer_usleep(1000); // wait .001 seconds
             }
-            xtimer_usleep(1000000); // wait 1 seconds
+            xtimer_usleep(500000); // wait 0.5 seconds
         }
         printf("UDP:");
         for (i = 0; i < numNodes; i++) {
@@ -402,9 +403,9 @@ void *_udp_server(void *args)
 
                 char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
                 udp_send(4, argsMsg);
-                xtimer_usleep(100000); // wait .1 seconds
+                xtimer_usleep(1000); // wait .001 seconds
             }
-            xtimer_usleep(1000000); // wait 1 seconds
+            xtimer_usleep(500000); // wait 0.5 seconds
         }
 
     } else if (strcmp(MY_TOPO,"grid") == 0) {
@@ -417,12 +418,12 @@ void *_udp_server(void *args)
 
     // synchronization? tell nodes to go?
     memset(msg, 0, MAX_IPC_MESSAGE_SIZE);
-    xtimer_usleep(5000000); // wait 5 seconds
+    xtimer_usleep(2000000); // wait 2 seconds
     for (i = 0; i < numNodes; i++) {
         strcpy(msg, "start;");
         char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
         udp_send(4, argsMsg);
-        xtimer_usleep(1000); // wait .001 seconds
+        //xtimer_usleep(1000); // wait .001 seconds
     }
 
     printf("UDP: start messages sent\n");
@@ -456,32 +457,44 @@ void *_udp_server(void *args)
 
         // handle UDP message
         if (res == 1) {
-            //Getting results from a node
-            //Form is "results;<elected_leader_id>;<runtime>;<message_count>;"
-            if (strncmp(server_buffer,"results;",8) == 0) {
-                //If we are already done don't save results anymore
+            if (strncmp(server_buffer,"failure;",8) == 0) {
+                // a node has failed, terminate algorithm
+                printf("ERROR: protocol failed by node %s\n", ipv6);
+                for (i = 0; i < numNodes; i++) {
+                    strcpy(msg, "failure;");
+                    char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
+                    udp_send(4, argsMsg);
+                    xtimer_usleep(1000); // wait .001 seconds
+                }
+                break;
+
+            // Getting results from a node
+            } else if (strncmp(server_buffer,"results;",8) == 0) {
+                // If we are already done don't save results anymore
                 if (!finished) {
-                    //TODO Save data somehow and check for reduntant data (right now the nodes will only report thier results once)
                     int correct = -1;
+
+                    char *argsMsg[] = { "udp_send", ipv6, portBuf, rconf, NULL };
+                    udp_send(4, argsMsg);
 
                     if (numNodesFinished == 0) {
                         printf("\nnode,elected,correct,startTime,runTime,messages\n");
                     }
 
-
                     int index = getNeighborIndex(nodes,ipv6);
                     if (confirmed[index] == 1) {
-                        //printf("UDP: node %s was already confirmed\n", ipv6);
+                        printf("UDP: node %s was already confirmed\n", ipv6);
                         continue;
                     }
 
-                    //Save data
+                    // extract data
                     strcpy(msg, server_buffer);
                     char *mem = msg;
-                    extractMsgSegment(&mem, codeBuf); //chop off the results string
-                    extractMsgSegment(&mem, tempipv6); //Extract the elected IP
+                    extractMsgSegment(&mem, codeBuf);  // chop off the results string
+                    extractMsgSegment(&mem, tempipv6); // extract the elected IP
                     //printf("UDP: Node %s elected %s as leader\n",ipv6,tempipv6);
 
+                    // determine election correctness
                     if (strcmp(tempipv6,nodes[minIndex]) == 0) {
                         correctNodes += 1;
                         correct = 1;
@@ -490,10 +503,10 @@ void *_udp_server(void *args)
                         correct = 0;
                     }
 
-                    extractMsgSegment(&mem, tempstarttime); //Extract the start time
+                    extractMsgSegment(&mem, tempstarttime); // Extract the start time
                     //printf("UDP: Node %s started at %s microseconds\n",ipv6,tempstarttime);
 
-                    extractMsgSegment(&mem, tempruntime); //Extract the run time
+                    extractMsgSegment(&mem, tempruntime); // Extract the run time
                     //printf("UDP: Node %s finished in %s microseconds\n",ipv6,tempruntime);
 
                     int time = atoi(tempruntime);
@@ -503,7 +516,7 @@ void *_udp_server(void *args)
                         maxTime = time;
                     sumTime += time;
 
-                    extractMsgSegment(&mem, tempmessagecount); //Extract the message count
+                    extractMsgSegment(&mem, tempmessagecount); // Extract the message count
                     //printf("UDP: Node %s exchanged %s messages\n",ipv6,tempmessagecount);
 
                     int msgs = atoi(tempmessagecount);
@@ -518,17 +531,15 @@ void *_udp_server(void *args)
                     confirmed[index] = 1; // results confirmed
                     numNodesFinished++;
 
-                    char *argsMsg[] = { "udp_send", ipv6, portBuf, rconf, NULL };
-                    udp_send(4, argsMsg);
-
                     //printf("UDP: %d nodes reported so far\n",numNodesFinished);
                     if (numNodesFinished >= numNodes) {
-                        printf("Correctness: %s\n", correctNodes == numNodesFinished ? "yes" : "no");
-                        printf("AvgTime: %d/%d\n", sumTime, numNodesFinished);
-                        printf("AvgMsgs: %d/%d\n", sumMsgs, numNodesFinished);
+                        printf("Correct: %s\n", correctNodes == numNodesFinished ? "yes" : "no");
+                        printf("AvgTime: %.2f sec\n", ((float)sumTime / 1000000.0) / (float)numNodesFinished);
+                        printf("AvgMsgs: %.2f msgs\n", (float)sumMsgs / (float)numNodesFinished);
 
                         printf("\nUDP: All nodes have reported!\n");
                         finished = 1;
+                        break; // terminate
                     }
                 }
             }
