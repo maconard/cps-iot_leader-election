@@ -144,8 +144,8 @@ void *_udp_server(void *args)
     char *msgP = (char*)calloc(SERVER_BUFFER_SIZE, sizeof(char));
 
     uint32_t lastDiscover = 0;
-    uint32_t wait = 3*1000000; // 3 seconds
-    int discoverLoops = 2; // 6 seconds of discovery
+    uint32_t wait = 2.5*1000000; // 2.5 seconds
+    int discoverLoops = 4; // 10 seconds of discovery
 
     // create the socket
     if(sock_udp_create(&sock, &server, NULL, 0) < 0) {
