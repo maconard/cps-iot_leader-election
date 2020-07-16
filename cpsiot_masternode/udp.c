@@ -26,12 +26,11 @@
 
 #define CHANNEL                 11
 
-#define SERVER_MSG_QUEUE_SIZE   (16)
-#define SERVER_BUFFER_SIZE      (128)
+#define SERVER_MSG_QUEUE_SIZE   (32)
+#define SERVER_BUFFER_SIZE      (255)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_IPC_MESSAGE_SIZE    (128)
 
-#define MAX_NODES               (20)
+#define MAX_NODES               (10)
 
 #define QUOTE(name) #name
 #define STR(macro) QUOTE(macro)
@@ -157,8 +156,8 @@ void *_udp_server(void *args)
 
     // main server loop
     while (1) {
-        memset(msg, 0, MAX_IPC_MESSAGE_SIZE);
-        memset(msgP, 0, MAX_IPC_MESSAGE_SIZE);
+        memset(msg, 0, SERVER_BUFFER_SIZE);
+        memset(msgP, 0, SERVER_BUFFER_SIZE);
         memset(server_buffer, 0, SERVER_BUFFER_SIZE);
 
         // discover nodes
@@ -171,7 +170,7 @@ void *_udp_server(void *args)
             udp_send_multi(3, argsMsg);
             discoverLoops--;
             lastDiscover = xtimer_now_usec();
-            memset(msg, 0, MAX_IPC_MESSAGE_SIZE);
+            memset(msg, 0, SERVER_BUFFER_SIZE);
         }
     
         // incoming UDP
@@ -239,8 +238,8 @@ void *_udp_server(void *args)
     }
     printf("\n");
 
-    memset(msg, 0, MAX_IPC_MESSAGE_SIZE);
-    memset(msgP, 0, MAX_IPC_MESSAGE_SIZE);
+    memset(msg, 0, SERVER_BUFFER_SIZE);
+    memset(msgP, 0, SERVER_BUFFER_SIZE);
     memset(server_buffer, 0, SERVER_BUFFER_SIZE);
 
     // send out topology info to all discovered nodes
@@ -250,7 +249,7 @@ void *_udp_server(void *args)
         int j;
         for (j = 0; j < 2; j++) { // send topology info 2 time(s)
             for (i = 0; i < numNodes; i++) {
-                memset(msg, 0, MAX_IPC_MESSAGE_SIZE);
+                memset(msg, 0, SERVER_BUFFER_SIZE);
 
                 int pre = (i-1);
                 int post = (i+1);
@@ -296,7 +295,7 @@ void *_udp_server(void *args)
         int j;
         for (j = 0; j < 2; j++) { // send topology info 2 time(s)
             for (i = 0; i < numNodes; i++) {
-                memset(msg, 0, MAX_IPC_MESSAGE_SIZE);
+                memset(msg, 0, SERVER_BUFFER_SIZE);
 
                 int pre = (i-1);
                 int post = (i+1);
@@ -351,7 +350,7 @@ void *_udp_server(void *args)
         int j;
         for (j = 0; j < 2; j++) {
             for (i = 0; i < numNodes; i++) {
-                memset(msg, 0, MAX_IPC_MESSAGE_SIZE);
+                memset(msg, 0, SERVER_BUFFER_SIZE);
 
                 int parent = (i-1)/2;
                 int left = (i*2)+1;
@@ -417,7 +416,7 @@ void *_udp_server(void *args)
     }
 
     // synchronization? tell nodes to go?
-    memset(msg, 0, MAX_IPC_MESSAGE_SIZE);
+    memset(msg, 0, SERVER_BUFFER_SIZE);
     xtimer_usleep(2000000); // wait 2 seconds
     for (i = 0; i < numNodes; i++) {
         strcpy(msg, "start;");
@@ -432,8 +431,8 @@ void *_udp_server(void *args)
     while (1) {
         // incoming UDP
         int res;
-        memset(msg, 0, MAX_IPC_MESSAGE_SIZE);
-        memset(msgP, 0, MAX_IPC_MESSAGE_SIZE);
+        memset(msg, 0, SERVER_BUFFER_SIZE);
+        memset(msgP, 0, SERVER_BUFFER_SIZE);
         memset(server_buffer, 0, SERVER_BUFFER_SIZE);
 
         if ((res = sock_udp_recv(&sock, server_buffer,

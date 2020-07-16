@@ -21,8 +21,8 @@
 
 // Size definitions
 #define CHANNEL                 11
-#define SERVER_MSG_QUEUE_SIZE   (16)
-#define SERVER_BUFFER_SIZE      (128)
+#define SERVER_MSG_QUEUE_SIZE   (32)
+#define SERVER_BUFFER_SIZE      (255)
 #define IPV6_ADDRESS_LEN        (46)
 #define MAX_NEIGHBORS           (6)
 
@@ -424,11 +424,14 @@ void *_udp_server(void *args)
                         for (i = 0; i < numNeighbors; i++) {    // line 7a and 7ai
                             if (neighborsVal[i] == 257) {
                                 // inform master of failure
-                                printf("ERROR: we have failed, informing the master\n");
-                                strcpy(msg, "failure;");
-                                char *argsMsg[] = { "udp_send", masterIPv6, portBuf, msg, NULL };
-                                udp_send(4, argsMsg);
-                                return NULL;
+                                //printf("ERROR: we have failed, informing the master\n");
+                                //strcpy(msg, "failure;");
+                                //char *argsMsg[] = { "udp_send", masterIPv6, portBuf, msg, NULL };
+                                //udp_send(4, argsMsg);
+                                //return NULL;
+
+                                // for now, don't fail, try to continue on
+                                printf("ERROR: we did not hear from a node, continuing anyways\n");
                             }
                         }
                         stateLE = 2;
