@@ -170,7 +170,7 @@ void *_udp_server(void *args)
     uint32_t startTimeLE = 0;       // when leader election started
     uint32_t endTimeLE = 0;         // when leader election ended
     uint32_t convergenceTimeLE = 0; // leader election convergence time
-    bool hasElectedLeader = false;  // has a leader been elected
+    //bool hasElectedLeader = false;  // has a leader been elected
     bool updated = false;           // flag for line 12 of pseudocode
 
     // neighbor variables
@@ -268,6 +268,9 @@ void *_udp_server(void *args)
                     extractMsgSegment(&mem,mStr);   // extract my m value
                     m = (uint32_t)atoi(mStr);       // convert to integer
                     local_min = m;                  // I am the starting local_min
+
+                    memset(myIPv6, 0, IPV6_ADDRESS_LEN);
+                    memset(leaderIPv6, 0, IPV6_ADDRESS_LEN);
                     extractMsgSegment(&mem,myIPv6); // extract my IP
                     strcpy(leaderIPv6, myIPv6); // I am the starting leader
 
@@ -320,6 +323,10 @@ void *_udp_server(void *args)
                 extractMsgSegment(&mem,IPv6_2);     // obtain owner ID
                 i = getNeighborIndex(neighbors, IPv6_1);  // check the sender/neighbor
 
+                if (DEBUG == 1) {
+                    printf("LE: m_msg = %s\n", server_buffer);
+                }
+
                 if (i < 0) {
                     printf("ERROR: sender of message not found in neighbor list (%s)\n", IPv6_1);
                     continue;
@@ -327,7 +334,7 @@ void *_udp_server(void *args)
 
                 localM = (uint32_t)atoi(mStr);
                 if (localM <= 0 || localM >= 256) {
-                    printf("ERROR: m value is out of range, %"PRIu32"\n", localM);
+                    printf("ERROR: le_ack, m value is out of range, %"PRIu32"\n", localM);
                     continue;
                 }
 
@@ -361,13 +368,14 @@ void *_udp_server(void *args)
             // master confirmed our results
             } else if (strncmp(server_buffer,"rconf",5) == 0) {
                 rconf = 1;
+                runningLE = false;
                 printf("UDP: master confirmed results, terminating\n");
                 break; // terminate correctly
             }
         }
 
         // if running leader election currently
-        if (runningLE && !hasElectedLeader) {
+        if (runningLE) {
 
             // *** line 5 of pseudocode
             if (stateLE == 0) { 
@@ -449,10 +457,19 @@ void *_udp_server(void *args)
                     memset(newLeaderIPv6, 0, IPV6_ADDRESS_LEN);
                     strcpy(newLeaderIPv6, leaderIPv6);
 
+                    if (DEBUG == 1) {
+                        printf("\nLE: min/newMin %"PRIu32"/%"PRIu32"\n", local_min, new_local_min);
+                        printf("LE: leader/newLeader, %s/%s\n", leaderIPv6, newLeaderIPv6);
+                    }
+
                     for (i = 0; i < numNeighbors; i++) {
-                        // check for bad m values
+                        if (DEBUG == 1) {
+                            printf(" %d: m=%"PRIu32", curLeader=%s\n", i+1, neighborsVal[i], neighborsLeaders[i]);
+                        }
+
+                        // don't have values from this neighbor, skip them
                         if (neighborsVal[i] <= 0 || neighborsVal[i] >= 256) {
-                            printf("ERROR: m value is out of range, %"PRIu32"\n", neighborsVal[i]);
+                            //printf("  ERROR: stateLE==2, m value is out of range, %"PRIu32"\n", neighborsVal[i]);
                             continue;
                         }
 
@@ -541,8 +558,8 @@ void *_udp_server(void *args)
 
             // protocol complete, *** line 9
             } else if (stateLE == 3) {
-                // send results every 5 seconds until confirmed
-                if (rconf == 0 && lastT < xtimer_now_usec() - 5000000) {
+                // send results every LE_T seconds until confirmed
+                if (rconf == 0 && lastT < xtimer_now_usec() - LE_T) {
                     int tMsgs = messagesIn + messagesOut;
 
                     // display election results
@@ -559,8 +576,7 @@ void *_udp_server(void *args)
                         printf("LE: converge=%"PRIu32"\n", convergenceTimeLE);
                         printf("LE: messages=%d\n\n", tMsgs);
 
-                        runningLE = false;
-                        hasElectedLeader = true;
+                        //hasElectedLeader = true;
                         countedMs = 0;
                     }
                     sendRes += 1;

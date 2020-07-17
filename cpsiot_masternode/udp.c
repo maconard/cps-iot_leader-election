@@ -533,8 +533,8 @@ void *_udp_server(void *args)
                     //printf("UDP: %d nodes reported so far\n",numNodesFinished);
                     if (numNodesFinished >= numNodes) {
                         printf("Correct: %s\n", correctNodes == numNodesFinished ? "yes" : "no");
-                        printf("AvgTime: %.2f sec\n", ((float)sumTime / 1000000.0) / (float)numNodesFinished);
-                        printf("AvgMsgs: %.2f msgs\n", (float)sumMsgs / (float)numNodesFinished);
+                        printf("AvgTime: %d/%d sec\n", sumTime, numNodesFinished);
+                        printf("AvgMsgs: %d/%d msgs\n", sumMsgs, numNodesFinished);
 
                         printf("\nUDP: All nodes have reported!\n");
                         finished = 1;
