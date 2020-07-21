@@ -4,7 +4,7 @@
 # Generates binaries for a range of parameters
 
 # Note: T should be entered in seconds
-# Note: will default to ranges K=(2,10,1) and T=(0.3,2.0,0.1)
+# Note: will default to ranges K=(2,10,1) and T=(0.3,2.5,0.1)
 
 # usage: ./generate_binaries <board> <min_K> <max_K> <step_K> <min_T> <max_T> <step_T>
 
@@ -23,12 +23,12 @@ if [[ "$BOARD" != "iotlab-m3" && "$BOARD" != "native" ]]; then
 fi
 
 if [[ "$MIN_K" == "" ]]; then
-    echo "No constraints entered, defaulting to ranges K=(2,10,1) and T=(0.3,2.0,0.1)"
+    echo "No constraints entered, defaulting to ranges K=(2,10,1) and T=(0.3,2.5,0.1)"
     MIN_K=2
     MAX_K=10
     STEP_K=1
     MIN_T=0.3
-    MAX_T=2.0
+    MAX_T=2.5
     STEP_T=0.1
 elif [[ "$MAX_K" == "" ]]; then
     echo "Please enter no K/T constraints or all of them."
