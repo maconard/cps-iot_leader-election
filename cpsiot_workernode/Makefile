@@ -7,9 +7,6 @@ APPLICATION = worker_node
 #BOARD ?= native # native for testing
 BOARD ?= iotlab-m3 # m3 nodes on iotlab
 
-LE_K ?= 5 # default to 5
-LE_T ?= 3000000 # default to 3 seconds
-
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..
 
@@ -66,9 +63,6 @@ QUIET ?= 1
 #CFLAGS += -DSTDIO_UART_DEV=$(STDIO_DEV)
 
 CFLAGS += -DGNRC_PKTBUF_SIZE=512
-
-CFLAGS += -DLE_K=$(LE_K)
-CFLAGS += -DLE_T=$(LE_T)
 
 FEATURES_OPTIONAL += periph_rtc
 
