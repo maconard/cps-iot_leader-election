@@ -19,20 +19,15 @@
 #include "net/sock/udp.h"
 #include "net/ipv6/addr.h"
 
+// Inlcude leader election parameters
+#include "leaderElectionParams.h"
+
 // Size definitions
 #define CHANNEL                 11
 #define SERVER_MSG_QUEUE_SIZE   (16)
 #define SERVER_BUFFER_SIZE      (512)
 #define IPV6_ADDRESS_LEN        (46)
 #define MAX_NEIGHBORS           (6)
-
-// Leader Election values
-#ifndef LE_K
-    #define LE_K    (5)
-#endif
-#ifndef LE_T
-    #define LE_T    (3.00*1000000)
-#endif
 
 #define DEBUG       (0)
 

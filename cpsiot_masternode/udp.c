@@ -24,6 +24,9 @@
 #include "net/sock/udp.h"
 #include "net/ipv6/addr.h"
 
+// Inlcude leader election parameters
+#include "leaderElectionParams.h"
+
 #define CHANNEL                 11
 
 #define SERVER_MSG_QUEUE_SIZE   (16)
@@ -31,16 +34,6 @@
 #define IPV6_ADDRESS_LEN        (46)
 
 #define MAX_NODES               (10)
-
-#define QUOTE(name) #name
-#define STR(macro) QUOTE(macro)
-
-// 1=ring, 2=line, 3=tree, 4=grid, 5=mesh
-#ifndef LE_TOPO
-    #define LE_TOPO             ring
-#endif
-
-#define MY_TOPO                 STR(LE_TOPO)
 
 #define DEBUG                   (0)
 
