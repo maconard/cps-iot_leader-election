@@ -26,8 +26,8 @@
 
 #define CHANNEL                 11
 
-#define SERVER_MSG_QUEUE_SIZE   (32)
-#define SERVER_BUFFER_SIZE      (255)
+#define SERVER_MSG_QUEUE_SIZE   (16)
+#define SERVER_BUFFER_SIZE      (512)
 #define IPV6_ADDRESS_LEN        (46)
 
 #define MAX_NODES               (10)
@@ -42,7 +42,7 @@
 
 #define MY_TOPO                 STR(LE_TOPO)
 
-#define DEBUG                   0
+#define DEBUG                   (0)
 
 // Forward declarations
 void *_udp_server(void *args);
@@ -242,6 +242,29 @@ void *_udp_server(void *args)
     memset(msgP, 0, SERVER_BUFFER_SIZE);
     memset(server_buffer, 0, SERVER_BUFFER_SIZE);
 
+    for (i = 0; i < numNodes; i++) {
+        strcpy(msg, "you;");
+        memset(mStr, 0, 5);
+        sprintf(mStr, "%d;", m_values[i]);
+        strcat(msg, mStr);
+        strcat(msg, nodes[i]);
+        strcat(msg, ";");
+
+        if (DEBUG == 1) {
+            printf("UDP: sending m/identify info to %s\n", nodes[i]);
+        }
+        
+        char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
+        udp_send(4, argsMsg);
+        xtimer_usleep(1000); // wait .001 seconds
+    }
+
+    memset(msg, 0, SERVER_BUFFER_SIZE);
+    memset(msgP, 0, SERVER_BUFFER_SIZE);
+    memset(server_buffer, 0, SERVER_BUFFER_SIZE);
+
+    xtimer_usleep(500000); // wait 0.5 seconds
+
     // send out topology info to all discovered nodes
     if (strcmp(MY_TOPO,"ring") == 0) {
         // compose message, "ips:<m>;<yourIP>;<neighbor1>;<neighbor2>;
@@ -261,12 +284,7 @@ void *_udp_server(void *args)
                     printf("UDP: node %d's neighbors are %d and %d\n", i, pre, post);
                 }
                 strcpy(msg, "ips;");
-                memset(mStr, 0, 5);
-                sprintf(mStr, "%d;", m_values[i]);
-                strcat(msg, mStr);
 
-                strcat(msg, nodes[i]);
-                strcat(msg, ";");
                 strcat(msg, nodes[pre]);
                 strcat(msg, ";");
                 strcat(msg, nodes[post]);
@@ -310,12 +328,6 @@ void *_udp_server(void *args)
                 }
 
                 strcpy(msg, "ips;");
-                memset(mStr, 0, 5);
-                sprintf(mStr, "%d;", m_values[i]);
-                
-                strcat(msg, mStr);
-                strcat(msg, nodes[i]);
-                strcat(msg, ";");
 
                 if (pre != -1) {
                     strcat(msg, nodes[pre]);
@@ -376,12 +388,6 @@ void *_udp_server(void *args)
                 }
 
                 strcpy(msg, "ips;");
-                memset(mStr, 0, 5);
-                sprintf(mStr, "%d;", m_values[i]);
-                
-                strcat(msg, mStr);
-                strcat(msg, nodes[i]);
-                strcat(msg, ";");
                 
                 if (i > 0) { //has a parent neighbor
                     strcat(msg, nodes[parent]);
@@ -417,12 +423,16 @@ void *_udp_server(void *args)
 
     // synchronization? tell nodes to go?
     memset(msg, 0, SERVER_BUFFER_SIZE);
-    xtimer_usleep(2000000); // wait 2 seconds
-    for (i = 0; i < numNodes; i++) {
-        strcpy(msg, "start;");
-        char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
-        udp_send(4, argsMsg);
-        //xtimer_usleep(1000); // wait .001 seconds
+    xtimer_usleep(1000000); // wait 1 second
+
+    int j;
+    for (j = 0; j < 2; j++) {
+        for (i = 0; i < numNodes; i++) {
+            strcpy(msg, "start;");
+            char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
+            udp_send(4, argsMsg);
+            xtimer_usleep(2000); // wait .002 seconds
+        }
     }
 
     printf("UDP: start messages sent\n");

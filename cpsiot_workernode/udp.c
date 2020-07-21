@@ -21,8 +21,8 @@
 
 // Size definitions
 #define CHANNEL                 11
-#define SERVER_MSG_QUEUE_SIZE   (32)
-#define SERVER_BUFFER_SIZE      (255)
+#define SERVER_MSG_QUEUE_SIZE   (16)
+#define SERVER_BUFFER_SIZE      (512)
 #define IPV6_ADDRESS_LEN        (46)
 #define MAX_NEIGHBORS           (6)
 
@@ -172,6 +172,7 @@ void *_udp_server(void *args)
     uint32_t convergenceTimeLE = 0; // leader election convergence time
     //bool hasElectedLeader = false;  // has a leader been elected
     bool updated = false;           // flag for line 12 of pseudocode
+    int loopCount = 0;
 
     // neighbor variables
     int numNeighbors = 0;   // number of neighbors
@@ -202,20 +203,24 @@ void *_udp_server(void *args)
 
     // main server loop
     while (1) {
+        loopCount += 1;
+        if (loopCount % 10 == 0)
+            printf("TEST: top, runningLE=%s, myMin=%"PRIu32", myIPv6=%s\n", runningLE ? "yes" : "no", local_min, myIPv6);
         // incoming UDP
         memset(server_buffer, 0, SERVER_BUFFER_SIZE);
         memset(msg, 0, SERVER_BUFFER_SIZE);
         memset(msgP, 0, SERVER_BUFFER_SIZE);
         memset(mStr, 0, 4);
 
-        if (server_buffer == NULL || sizeof(server_buffer) - 1 <= 0) {
+        if (server_buffer == NULL || SERVER_BUFFER_SIZE - 1 <= 0) {
             printf("ERROR: failed sock_udp_recv preconditions\n");
             return NULL;
         }
 
         if ((res = sock_udp_recv(&my_sock, server_buffer,
-                 sizeof(server_buffer) - 1, 0.03 * US_PER_SEC, //SOCK_NO_TIMEOUT,
+                 SERVER_BUFFER_SIZE - 1, 0.03 * US_PER_SEC, //SOCK_NO_TIMEOUT,
                  &remote)) < 0) {
+
             if (res != 0 && res != -ETIMEDOUT && res != -EAGAIN) {
                 printf("WARN: failed to receive UDP, %d\n", res);
             }
@@ -225,16 +230,15 @@ void *_udp_server(void *args)
         }
         else {
             server_buffer[res] = '\0';
-            res = 1;
             countMsgIn();
             ipv6_addr_to_str(IPv6_1, (ipv6_addr_t *)&remote.addr.ipv6, IPV6_ADDRESS_LEN);
             if (DEBUG == 1) {
-                printf("UDP: recvd: %s from %s\n", server_buffer, IPv6_1);
+                printf("UDP: recvd size=%d, %s from %s\n", res, server_buffer, IPv6_1);
             }
         }
 
         // react to UDP message
-        if (res == 1) {
+        if (res >= 1) {
             // the master is discovering us
             if (strncmp(server_buffer,"ping;",5) == 0) {
                 if (!discovered) { 
@@ -253,6 +257,26 @@ void *_udp_server(void *args)
 
                 printf("UDP: master node (%s) confirmed us\n", masterIPv6);
 
+            // received my IP
+            } else if (strncmp(server_buffer,"you;",4) == 0) {
+                strcpy(msgP, server_buffer);
+                char *mem = msgP;
+
+                extractMsgSegment(&mem, codeBuf);
+
+                if (DEBUG == 1) {
+                    printf("UDP: my m/IP = %s\n", mem);
+                }
+
+                memset(mStr, 0, 5);
+                extractMsgSegment(&mem,mStr);   // extract my m value
+                m = (uint32_t)atoi(mStr);       // convert to integer
+                local_min = m;                  // I am the starting local_min
+                memset(leaderIPv6, 0, IPV6_ADDRESS_LEN);
+                memset(myIPv6, 0, IPV6_ADDRESS_LEN);
+                extractMsgSegment(&mem, myIPv6);
+                strcpy(leaderIPv6, myIPv6); // I am the starting leader
+
             // information about our IP and neighbors
             } else if (strncmp(server_buffer,"ips;",4) == 0) {
                 // process IP and neighbors
@@ -260,19 +284,11 @@ void *_udp_server(void *args)
                     strcpy(msgP, server_buffer);
                     char *mem = msgP;
 
+                    extractMsgSegment(&mem,codeBuf);
+
                     if (DEBUG == 1) {                    
                         printf("UDP: ips = %s\n", mem);
                     }
-
-                    extractMsgSegment(&mem,codeBuf);
-                    extractMsgSegment(&mem,mStr);   // extract my m value
-                    m = (uint32_t)atoi(mStr);       // convert to integer
-                    local_min = m;                  // I am the starting local_min
-
-                    memset(myIPv6, 0, IPV6_ADDRESS_LEN);
-                    memset(leaderIPv6, 0, IPV6_ADDRESS_LEN);
-                    extractMsgSegment(&mem,myIPv6); // extract my IP
-                    strcpy(leaderIPv6, myIPv6); // I am the starting leader
 
                     // extract neighbors IPs from message
                     while(strlen(mem) > 1) {
@@ -285,6 +301,11 @@ void *_udp_server(void *args)
 
             // start leader election
             } else if (strncmp(server_buffer,"start;",6) == 0) {
+                if (runningLE) {
+                    messagesIn -= 1;
+                    continue;
+                }
+
                 // start leader election
                 printf("UDP: My IPv6 is: %s, m=%"PRIu32"\n", myIPv6, m);
                 printf("LE: Topology assignment complete, %d neighbors:\n",numNeighbors);
@@ -315,17 +336,18 @@ void *_udp_server(void *args)
                 strcpy(msgP, server_buffer);
                 char *mem = msgP;
                 uint32_t localM = 257;
-
                 memset(IPv6_2, 0, IPV6_ADDRESS_LEN);
                 memset(mStr, 0, 5);
+
                 extractMsgSegment(&mem,codeBuf);    // remove header
-                extractMsgSegment(&mem,mStr);       // get m value
-                extractMsgSegment(&mem,IPv6_2);     // obtain owner ID
-                i = getNeighborIndex(neighbors, IPv6_1);  // check the sender/neighbor
 
                 if (DEBUG == 1) {
                     printf("LE: m_msg = %s\n", server_buffer);
                 }
+
+                extractMsgSegment(&mem,mStr);       // get m value
+                extractMsgSegment(&mem,IPv6_2);     // obtain owner ID
+                i = getNeighborIndex(neighbors, IPv6_1);  // check the sender/neighbor
 
                 if (i < 0) {
                     printf("ERROR: sender of message not found in neighbor list (%s)\n", IPv6_1);

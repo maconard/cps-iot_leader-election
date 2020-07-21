@@ -3,7 +3,7 @@
 # Build, name, and sort RIOT binaries
 # helps speed up the recompiling process
 
-# Note: T1 and T2 should be entered in seconds
+# Note: T should be entered in seconds
 
 # usage: ./collect_binary <board> <master|worker> <topo|K> <T>
 

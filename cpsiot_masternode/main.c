@@ -26,8 +26,9 @@
 
 #define CHANNEL                 11
 
-#define MAIN_QUEUE_SIZE         (4)
-#define MAX_IPC_MESSAGE_SIZE    (64)
+#define MAIN_QUEUE_SIZE         (16)
+#define MAX_IPC_MESSAGE_SIZE    (512)
+#define SERVER_BUFFER_SIZE      (512)
 #define IPV6_ADDRESS_LEN        (46)
 #define MAX_NODES               (20)
 
