@@ -8,4 +8,6 @@
 */out/
 */out/*
 binaries/*/worker/*
+cpsiot_masternode/leaderElectionParams.h
+cpsiot_workernode/leaderElectionParams.h
 
