@@ -25,9 +25,9 @@
 // Size definitions
 #define CHANNEL                 11
 #define SERVER_MSG_QUEUE_SIZE   (16)
-#define SERVER_BUFFER_SIZE      (512)
-#define IPV6_ADDRESS_LEN        (46)
-#define MAX_NEIGHBORS           (6)
+#define SERVER_BUFFER_SIZE      (256)
+#define IPV6_ADDRESS_LEN        (40)
+#define MAX_NEIGHBORS           (5)
 
 #define DEBUG       (0)
 
@@ -167,7 +167,7 @@ void *_udp_server(void *args)
     uint32_t convergenceTimeLE = 0; // leader election convergence time
     //bool hasElectedLeader = false;  // has a leader been elected
     bool updated = false;           // flag for line 12 of pseudocode
-    int loopCount = 0;
+    //int loopCount = 0;
 
     // neighbor variables
     int numNeighbors = 0;   // number of neighbors
@@ -195,12 +195,13 @@ void *_udp_server(void *args)
 
     server_running = true;
     printf("UDP: Success - started UDP server on port %u\n", server.port);
+    printf("UPD: K = %d\n", counter);
 
     // main server loop
     while (1) {
-        loopCount += 1;
-        if (loopCount % 10 == 0)
-            printf("TEST: top, runningLE=%s, myMin=%"PRIu32", myIPv6=%s\n", runningLE ? "yes" : "no", local_min, myIPv6);
+        //loopCount += 1;
+        //if (loopCount % 10 == 0)
+            //printf("TEST: top, runningLE=%s, myMin=%"PRIu32", myIPv6=%s\n", runningLE ? "yes" : "no", local_min, myIPv6);
         // incoming UDP
         memset(server_buffer, 0, SERVER_BUFFER_SIZE);
         memset(msg, 0, SERVER_BUFFER_SIZE);

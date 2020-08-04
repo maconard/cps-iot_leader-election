@@ -30,10 +30,10 @@
 #define CHANNEL                 11
 
 #define SERVER_MSG_QUEUE_SIZE   (16)
-#define SERVER_BUFFER_SIZE      (512)
-#define IPV6_ADDRESS_LEN        (46)
+#define SERVER_BUFFER_SIZE      (256)
+#define IPV6_ADDRESS_LEN        (40)
 
-#define MAX_NODES               (10)
+#define MAX_NODES               (30)
 
 #define DEBUG                   (0)
 
@@ -136,8 +136,8 @@ void *_udp_server(void *args)
     char *msgP = (char*)calloc(SERVER_BUFFER_SIZE, sizeof(char));
 
     uint32_t lastDiscover = 0;
-    uint32_t wait = 2.5*1000000; // 2.5 seconds
-    int discoverLoops = 4; // 10 seconds of discovery
+    uint32_t wait = 2*1000000; // 2 seconds
+    int discoverLoops = 5; // 10 seconds of discovery
 
     // create the socket
     if(sock_udp_create(&sock, &server, NULL, 0) < 0) {

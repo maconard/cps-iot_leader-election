@@ -55,14 +55,17 @@ fi
 # Build master binaries
 echo ""
 echo "Beginning master binary generation for line, ring, and tree..."
+echo ""
 ./collect_binary.sh $BOARD master line
 ./collect_binary.sh $BOARD master ring
 ./collect_binary.sh $BOARD master tree
+echo ""
 echo "Master node generation complete."
 echo ""
 
 # Build worker binaries
 echo "Beginning worker binary generation for ranges K=($MIN_K,$MAX_K,$STEP_K) and T=($MIN_T,$MAX_T,$STEP_T)..."
+echo ""
 for k in `seq $MIN_K $STEP_K $MAX_K`
 do
     for t in `seq $MIN_T $STEP_T $MAX_T`
