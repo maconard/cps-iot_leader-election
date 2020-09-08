@@ -18,7 +18,7 @@ STEP_T="$7"
 
 if [[ "$BOARD" != "iotlab-m3" && "$BOARD" != "native" ]]; then
     echo "Please select either iotlab-m3 or native."
-    echo "Usage: ./generate workers <board> <min_K> <max_K> <step_K> <min_T> <max_T> <step_T>"
+    echo "Usage: ./generate_binaries <board> <min_K> <max_K> <step_K> <min_T> <max_T> <step_T>"
     exit
 fi
 
