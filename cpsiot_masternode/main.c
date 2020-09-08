@@ -26,13 +26,13 @@
 
 #define CHANNEL                 11
 
-#define MAIN_QUEUE_SIZE         (16)
-#define MAX_IPC_MESSAGE_SIZE    (512)
-#define SERVER_BUFFER_SIZE      (512)
+#define MAIN_QUEUE_SIZE         (32)
+#define MAX_IPC_MESSAGE_SIZE    (128)
+#define SERVER_BUFFER_SIZE      (128)
 #define IPV6_ADDRESS_LEN        (46)
-#define MAX_NODES               (20)
+#define MAX_NODES               (50)
 
-#define DEBUG                   1
+#define DEBUG                   0
 
 // External functions defs
 extern int udp_send(int argc, char **argv);
@@ -40,13 +40,20 @@ extern int udp_server(int argc, char **argv);
 
 // Forward declarations
 static int hello_world(int argc, char **argv);
+static int myUnixSync(int argc, char **argv);
 static int run(int argc, char **argv);
 void substr(char *s, int a, int b, char *t);
 void extractMsgSegment(char **s, char *t);
 int indexOfSemi(char *ipv6);
 
+int ipc_msg_send_receive(char *message, kernel_pid_t destinationPID, msg_t *response, uint16_t type);
+int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking);
+int ipc_msg_reply(char *message, msg_t incoming);
+
 // Data structures (i.e. stacks, queues, message structs, etc)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
+static kernel_pid_t serverPid;
+static bool hasSynced = false;
 
 // ************************************
 // START MY CUSTOM RIOT SHELL COMMANDS
@@ -61,12 +68,108 @@ static int hello_world(int argc, char **argv) {
     return 0;
 }
 
+// sync shell command, syncronizes to unix time
+static int myUnixSync(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    if (hasSynced == true) {
+        printf("MAIN: clock was already synced, cannot sync again\n");
+        return 0;
+    }
+
+    if (argc < 2) {
+        printf("USAGE: sync <unix-timestamp>\n");
+        return 0;
+    }
+
+    uint32_t unixTime = atoi(argv[1]);
+    printf("MAIN: sync clock to %"PRIu32"\n", unixTime);
+
+    char* msg = (char*)calloc(32, sizeof(char));
+    sprintf(msg, "unix;%"PRIu32";", unixTime);
+    ipc_msg_send(msg, serverPid, true);
+    hasSynced = true;
+
+    return 0;
+}
+
+// sync shell command, syncronizes to unix time
+static int setDiscoverRounds(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    if (hasSynced == true) {
+        printf("MAIN: clock was already synced, cannot change discover configs\n");
+        return 0;
+    }
+
+    if (argc < 2) {
+        printf("USAGE: rounds <num-rounds>\n");
+        return 0;
+    }
+
+    int rounds = atoi(argv[1]);
+    printf("MAIN: set discover rounds to %d\n", rounds);
+
+    char* msg = (char*)calloc(32, sizeof(char));
+    sprintf(msg, "rounds;%d;", rounds);
+    ipc_msg_send(msg, serverPid, true);
+
+    return 0;
+}
+
+// IPC HELPER FUNCTIONS
+
+// Purpose: send message to destinationPID, blocking or not
+//
+// message char*, the message to send out
+// destinationPID kernel_pid_t, the destination thread ID
+// blocking bool, whether or not to block for message to be received
+int ipc_msg_send(char *message, kernel_pid_t destinationPID, bool blocking) {
+    msg_t msg_out;
+    msg_out.content.ptr = message;
+    msg_out.type = (uint16_t)strlen(message)+1;
+    //blocking = true;
+
+    if (DEBUG == 1) 
+        printf("DEBUG: send %s to %" PRIkernel_pid ", type=%d\n", (char*)msg_out.content.ptr, destinationPID, msg_out.type);
+    
+    int res;
+    if (blocking) {
+        res = msg_send(&msg_out, destinationPID);
+    } else {
+        res = msg_try_send(&msg_out, destinationPID);
+    }
+    
+    return res;
+}
+
+// Purpose: respond to an incoming message
+//
+// message char*, the message to reply with
+// incoming msg_t, the incoming message to reply to
+int ipc_msg_reply(char *message, msg_t incoming) {
+    msg_t msg_out;
+    msg_out.content.ptr = message;
+    msg_out.type = (uint16_t)strlen(message);
+
+    if (DEBUG == 1) 
+        printf("DEBUG: reply %s\n", (char*)msg_out.content.ptr);
+  
+    int res = msg_reply(&incoming, &msg_out);
+
+    return res;
+}
+
 // END MY CUSTOM RIOT SHELL COMMANDS
 // ************************************
 
 // shell command structure
 const shell_command_t shell_commands[] = {
     {"hello", "prints hello world", hello_world},
+    {"sync", "syncronize to unix time and starts experiment", myUnixSync},
+    {"rounds", "set the number of two-second node discover rounds", setDiscoverRounds},
     { NULL, NULL, NULL }
 };
 
@@ -126,10 +229,12 @@ static int run(int argc, char **argv) {
     (void) puts("MAIN: Trying to launch UDP server thread");
     char *argsUDP[] = { "udp_server", NULL };
     
-    if (udp_server(1, argsUDP) == -1) {
+    int pid = udp_server(1, argsUDP);
+    if (pid == 0) {
         (void) puts("MAIN: Error - failed to start UDP server thread");
     }
-    (void) puts("MAIN: Launched UDP server thread");
+    printf("MAIN: Launched UDP thread, PID=%d\n", pid);
+    serverPid = (kernel_pid_t)pid;
 
     return 0;
 }
@@ -137,12 +242,12 @@ static int run(int argc, char **argv) {
 // main method
 int main(void)
 {
+    (void) puts("MAIN: Welcome to RIOT!");
+
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
 
     run(0, NULL);
-
-    (void) puts("MAIN: Welcome to RIOT!");
-    printf("MAIN: starting master node\n");
+    hasSynced = false;
 
     // start the RIOT shell for this node
     char line_buf[SHELL_DEFAULT_BUFSIZE];
