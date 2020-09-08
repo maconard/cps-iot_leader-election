@@ -22,14 +22,17 @@ When running the `sync` command it is helpful to have a unix clock up and type o
 Assuming you ran the worker nodes with an energy monitoring profile, that information can be found on the iot-lab servers. Here is an example showing how to retrieve all experiment data from the Lille site for user `conard`:
 
 First login to the server via ssh:
+
 `ssh conard@lille.iot-lab.info`
 
 Archive all the experiment data to make it easy to transfer over the network:
+
 `zip -r myResultsFile.zip .iot-lab/`
 
 Return to your local shell to retrieve the archive file:
+
 `scp conard@lille.iot-lab.info:/senslab/users/conard/myResultsFile.zip myResultsFile.zip`
 
-And now all of the monitoring data is on your local machine. You can find the energy data under `.iot-lab/<exp-num>/consumptions/...`.
+And now all of the monitoring data is on your local machine. You can find the energy data under `.iot-lab/<exp-num>/consumption/...`.
 
 
