@@ -155,6 +155,7 @@ void *_udp_server(void *args)
     printf("UDP: Success - started UDP server on port %u\n\n", server.port);
     printf("UDP: set to 30 two-second rounds for 60 seconds of node discovery\n");
     printf("UDP: you should have approx nodes/2 discovery rounds, update it with \"rounds <num>\"\n");
+    printf("UDP: I will generate a %s topology\n", MY_TOPO);
     printf("UDP: waiting for clock sync\n");
     
     msg_t msg_u_in;
@@ -179,7 +180,7 @@ void *_udp_server(void *args)
             } else if (strncmp(codeBuf,"unix",4) == 0) {
                 unixTime = atoi(timeBuf);
                 syncTime = xtimer_now_usec();
-                printf("UDP: clock synced to unix %"PRIu32"\n\n", unixTime);
+                printf("UDP: clock synced to unix %"PRIu32"\n", unixTime);
                 break;
             }
         }
@@ -270,8 +271,8 @@ void *_udp_server(void *args)
             xtimer_usleep(50000); // wait 0.05 seconds
         }
 
-        if (DEBUG == 1)
-            printf(" found %d nodes:\n",numNodes);
+        if (DEBUG == 1 || expNum == 1)
+            printf("Found %d nodes:\n\n",numNodes);
 
         for (i = 0; i < MAX_NODES; i++) {
             if (strcmp(nodes[i],"") == 0) 
@@ -410,7 +411,7 @@ void *_udp_server(void *args)
                 printf("UDP: generating tree topology\n");
             int depth = (int)logk(numNodes,2);
             if (DEBUG == 1)
-                printf("UDP: numNodes=%d, depth=%d\n", numNodes, depth);
+                printf("UDP: numNodes=%d, depth=%d\n\n", numNodes, depth);
             int j;
             for (j = 0; j < 2; j++) {
                 for (i = 0; i < numNodes; i++) {
