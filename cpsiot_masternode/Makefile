@@ -20,20 +20,26 @@ RIOTBASE ?= $(CURDIR)/../..
 USEMODULE += gnrc
 USEMODULE += gnrc_netdev_default
 USEMODULE += auto_init_gnrc_netif
+
 # shell command to send L2 packets with a simple string
 USEMODULE += gnrc_txtsnd
+
 # Activate ICMPv6 error messages
 USEMODULE += gnrc_icmpv6_error
+
 # Specify the mandatory networking modules for IPv6 and UDP
 USEMODULE += gnrc_ipv6_default
-USEMODULE += gnrc_ipv6_router_default
+#USEMODULE += gnrc_ipv6_router_default
 USEMODULE += gnrc_udp
 USEMODULE += gnrc_sock_udp
+
 # Add a routing protocol
 USEMODULE += gnrc_rpl
 USEMODULE += auto_init_gnrc_rpl
+
 # This application dumps received packets to STDIO using the pktdump module
 USEMODULE += gnrc_pktdump
+
 # Additional networking modules that can be dropped if not needed
 USEMODULE += gnrc_icmpv6_echo
 
@@ -62,7 +68,7 @@ QUIET ?= 1
 #STDIO_DEV = UART_DEV\(1\)
 #CFLAGS += -DSTDIO_UART_DEV=$(STDIO_DEV)
 
-CFLAGS += -DGNRC_PKTBUF_SIZE=512
+CFLAGS += -DGNRC_PKTBUF_SIZE=1024
 
 FEATURES_OPTIONAL += periph_rtc
 

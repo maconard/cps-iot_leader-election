@@ -29,11 +29,13 @@
 
 #define CHANNEL                 11
 
-#define SERVER_MSG_QUEUE_SIZE   (32)
-#define SERVER_BUFFER_SIZE      (128)
-#define IPV6_ADDRESS_LEN        (40)
+#define SERVER_MSG_QUEUE_SIZE   (64)
+#define SERVER_BUFFER_SIZE      (256)
+#define MAX_IPC_MESSAGE_SIZE    (256)
+#define IPV6_ADDRESS_LEN        (22)
 
-#define MAX_NODES               (50)
+#define MAX_NODES               (70)
+#define MAX_EXP                 (10)
 
 #define DEBUG                   (0)
 
@@ -92,6 +94,20 @@ float logk(int x, int k) {
     return log10(x) / log10(k);
 }
 
+/*
+int getIndexOfSuffix(char* ip) {
+    int j;
+    int c = 0;
+    for (j = 0; j < (int)strlen(ip); j++)
+    {
+        if (ip[j] == ':')
+            c++;
+        if (c == 4)
+            return j;
+    }
+    return -1;
+}*/
+
 // Purpose: main code for the UDP server
 void *_udp_server(void *args)
 {
@@ -101,10 +117,17 @@ void *_udp_server(void *args)
     sock_udp_ep_t server = { .port = SERVER_PORT, .family = AF_INET6 };
     sock_udp_ep_t remote;
     msg_init_queue(server_msg_queue, SERVER_MSG_QUEUE_SIZE);
-    char ipv6[IPV6_ADDRESS_LEN] = { 0 };
-    char tempipv6[IPV6_ADDRESS_LEN] = { 0 };
+
+    char ipv6[30] = { 0 };
+    char tempipv6[30] = { 0 };
+    char ipv6_unique[20] = { 0 };
+    char ipv6_prefix[7] = "fe80::";
+    //char ipv6_suffix[12] = { 0 };
+
     char tempunixtime[15] = { 0 };
     char tempunixsec[15] = { 0 };
+    char tempdegree[15] = { 0 };
+    char temprunsec[15] = { 0 };
     char tempmessagecount[5] = { 0 };
     int m_values[MAX_NODES] = { 0 };
     int confirmed[MAX_NODES] = { 0 };
@@ -130,6 +153,17 @@ void *_udp_server(void *args)
         nodes[i] = (char*)calloc(IPV6_ADDRESS_LEN, sizeof(char));
     }
 
+    int numCorrect = 0;
+    char **expStarts = (char**)calloc(MAX_EXP, sizeof(char*));
+    for(i = 0; i < MAX_EXP; i++) {
+        expStarts[i] = (char*)calloc(15, sizeof(char));
+    }
+
+    char **expRuns = (char**)calloc(MAX_EXP, sizeof(char*));
+    for(i = 0; i < MAX_EXP; i++) {
+        expRuns[i] = (char*)calloc(15, sizeof(char));
+    }
+
     int failedNodes = 0;
     int correctNodes = 0;
     int minMsgs = 0;
@@ -137,14 +171,15 @@ void *_udp_server(void *args)
     int sumMsgs = 0;
     int min = 257;
     int minIndex = -1;
+    float maxRun = 0.0;
 
     char msg[SERVER_BUFFER_SIZE] = { 0 };
     char *msgP = (char*)calloc(SERVER_BUFFER_SIZE, sizeof(char));
 
     uint32_t lastDiscover = 0;
     uint32_t wait = 2*1000000;
-    int resetDiscoverLoops = 30;
-    int discoverLoops = 30; // 60sec of discovery
+    int resetDiscoverLoops = 3;
+    int discoverLoops = 3; // 10sec of discovery
 
     // create the socket
     if(sock_udp_create(&sock, &server, NULL, 0) < 0) {
@@ -153,8 +188,8 @@ void *_udp_server(void *args)
 
     server_running = true;
     printf("UDP: Success - started UDP server on port %u\n\n", server.port);
-    printf("UDP: set to 30 two-second rounds for 60 seconds of node discovery\n");
-    printf("UDP: you should have approx nodes/2 discovery rounds, update it with \"rounds <num>\"\n");
+    //printf("UDP: set to 30 two-second rounds for 60 seconds of node discovery\n");
+    //printf("UDP: you should have approx nodes/2 discovery rounds, update it with \"rounds <num>\"\n");
     printf("UDP: I will generate a %s topology\n", MY_TOPO);
     printf("UDP: waiting for clock sync\n");
     
@@ -189,14 +224,14 @@ void *_udp_server(void *args)
     }
 
     int expNum = 1;
-    while (expNum <= 10) {  // run the experiment 10 times
-        if (DEBUG == 1)
-            printf("Starting experiment %d...", expNum);
+    while (numCorrect < MAX_EXP) {  // run the experiment for 10 success
+        printf("Starting experiment %d... (%d correct, %d failed)\n", expNum, numCorrect, expNum-numCorrect-1);
         // main server loop
         while (1) {
             memset(msg, 0, SERVER_BUFFER_SIZE);
             memset(msgP, 0, SERVER_BUFFER_SIZE);
             memset(server_buffer, 0, SERVER_BUFFER_SIZE);
+            memset(ipv6, 0, 30);
 
             // discover nodes
             if (lastDiscover + wait < xtimer_now_usec()) {
@@ -214,19 +249,32 @@ void *_udp_server(void *args)
             // incoming UDP
             int res;
             if ((res = sock_udp_recv(&sock, server_buffer,
-                         sizeof(server_buffer) - 1, 0.05 * US_PER_SEC, //SOCK_NO_TIMEOUT,
+                         sizeof(server_buffer) - 1, 0.005 * US_PER_SEC, //SOCK_NO_TIMEOUT,
                          &remote)) < 0) {
-                if(res != 0 && res != -ETIMEDOUT && res != -EAGAIN && DEBUG == 1) 
+                if(res != 0 && res != -ETIMEDOUT && res != -EAGAIN && DEBUG == 1) {
                     printf("UDP: Error - failed to receive UDP, %d\n", res);
+                }
             }
             else if (res == 0) {
-                if (DEBUG == 1)
+                if (DEBUG == 1) {
                     (void) puts("UDP: no UDP data received");
+                }
             }
             else {
                 server_buffer[res] = '\0';
                 res = 1;
-                ipv6_addr_to_str(ipv6, (ipv6_addr_t *)&remote.addr.ipv6, IPV6_ADDRESS_LEN);
+                ipv6_addr_to_str(ipv6, (ipv6_addr_t *)&remote.addr.ipv6, 47);
+
+                //int c = getIndexOfSuffix(ipv6);
+                //if (strcmp(ipv6_suffix, "") == 0) {
+                //    strncpy(ipv6_suffix, ipv6+c, strlen(ipv6)-c);
+                //    printf("UDP: discovered IP suffix: %s\n", ipv6_suffix);
+                //}
+                int len = strlen(ipv6)-6;
+                memset(ipv6_unique, 0, IPV6_ADDRESS_LEN);
+                strncpy(ipv6_unique, ipv6+6, len);
+                ipv6_unique[len] = '\0';
+
                 if (DEBUG == 1) {
                     printf("UDP: recvd: %s from %s\n", server_buffer, ipv6);
                 }
@@ -238,10 +286,10 @@ void *_udp_server(void *args)
                 if (strncmp(server_buffer,"pong;",5) == 0) {
                     // if node with this ipv6 is already found, ignore
                     // otherwise record them
-                    int found = alreadyANeighbor(nodes, ipv6);
+                    int found = alreadyANeighbor(nodes, ipv6_unique);
                     //printf("For IP=%s, found=%d\n", ipv6, found);
                     if (found == 0 && numNodes < MAX_NODES) {
-                        strcpy(nodes[numNodes], ipv6);
+                        strcpy(nodes[numNodes], ipv6_unique);
                         if (DEBUG == 1) {
                             printf("UDP: recorded new node, %s\n", nodes[numNodes]);
                         }
@@ -257,36 +305,48 @@ void *_udp_server(void *args)
                                 min = m_values[minIndex];
                             }
                         }
+
+                        memset(mStr, 0, 5);
+                        sprintf(mStr, "%d;", m_values[numNodes]);
+
+                        strcpy(msg, "conf;");
+                        strcat(msg, mStr);
+                        strcat(msg, nodes[numNodes]);
+                        strcat(msg, ";");
+
+                        //printf("Confirming %s, sending %s\n", nodes[numNodes], msg);
                         
                         numNodes++;
                     
                         // send back discovery confirmation
-                        strcpy(msg, "conf;");
                         char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
                         udp_send(4, argsMsg);
                     }
                 }
             }
 
-            xtimer_usleep(50000); // wait 0.05 seconds
+            //xtimer_usleep(5000); // wait 0.005 seconds
         }
 
-        if (DEBUG == 1 || expNum == 1)
+        //if (DEBUG == 1)
             printf("Found %d nodes:\n\n",numNodes);
-
+/*
         for (i = 0; i < MAX_NODES; i++) {
             if (strcmp(nodes[i],"") == 0) 
                 continue;
-            if (DEBUG == 1)
-                printf("%2d: %s, m=%d\n", i, nodes[i], m_values[i]);
+            //if (DEBUG == 1) 
+                printf("%2d: %s m=%d\n", i, nodes[i], m_values[i]);
         }
-        if (DEBUG == 1)
+
+        //if (DEBUG == 1)
             printf("\n");
-    
+*/
         memset(msg, 0, SERVER_BUFFER_SIZE);
         memset(msgP, 0, SERVER_BUFFER_SIZE);
         memset(server_buffer, 0, SERVER_BUFFER_SIZE);
 
+/*
+        int q;
         for (i = 0; i < numNodes; i++) {
             strcpy(msg, "you;");
             memset(mStr, 0, 5);
@@ -294,14 +354,24 @@ void *_udp_server(void *args)
             strcat(msg, mStr);
             strcat(msg, nodes[i]);
             strcat(msg, ";");
+            strcat(msg, ipv6_suffix);
+            strcat(msg, ";");
 
-            if (DEBUG == 1) {
-                printf("UDP: sending m/identify info to %s\n", nodes[i]);
+            memset(ipv6, 0, 30);
+            strcat(ipv6, ipv6_prefix);
+            strcat(ipv6, nodes[i]);
+            strcat(ipv6, ipv6_suffix);
+
+            for (q = 0; q < 2; q++) { //send ip info 2 times
+                //if (DEBUG == 1) {
+                    printf("UDP: sending m/identify info to %s\n", nodes[i]);
+                //}
+
+                char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
+                udp_send(4, argsMsg);
+                xtimer_usleep(100000); // wait .1 seconds
             }
-            
-            char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
-            udp_send(4, argsMsg);
-            //xtimer_usleep(1000); // wait .001 seconds
+            xtimer_usleep(10000); // wait .01 seconds
         }
 
         memset(msg, 0, SERVER_BUFFER_SIZE);
@@ -309,14 +379,16 @@ void *_udp_server(void *args)
         memset(server_buffer, 0, SERVER_BUFFER_SIZE);
 
         xtimer_usleep(500000); // wait 0.5 seconds
+*/
 
         // send out topology info to all discovered nodes
         if (strcmp(MY_TOPO,"ring") == 0) {
             // compose message, "ips:<m>;<yourIP>;<neighbor1>;<neighbor2>;
             if (DEBUG == 1)
                 printf("UDP: generating ring topology\n");
+            printf("node, neighborID, neighbors\n");
             int j;
-            for (j = 0; j < 2; j++) { // send topology info 2 time(s)
+            for (j = 0; j < 3; j++) { // send topology info 3 time(s)
                 for (i = 0; i < numNodes; i++) {
                     memset(msg, 0, SERVER_BUFFER_SIZE);
 
@@ -326,8 +398,8 @@ void *_udp_server(void *args)
                     if (pre == -1) { pre = numNodes-1; }
                     if (post == numNodes) { post = 0; }
 
-                    if (j == 0 && DEBUG == 1) {
-                        printf("UDP: node %d [%s]'s neighbors are %d and %d\n", i, nodes[i], pre, post);
+                    if (j == 0) {
+                        printf("%s, %d, %d %d\n", nodes[i], i, pre, post);
                     }
                     strcpy(msg, "ips;");
 
@@ -340,7 +412,11 @@ void *_udp_server(void *args)
                         printf("UDP: Sending node %d's info: %s\n", i, msg);
                     }
 
-                    char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
+                    memset(ipv6, 0, 30);
+                    strcat(ipv6, ipv6_prefix);
+                    strcat(ipv6, nodes[i]);
+
+                    char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
                     udp_send(4, argsMsg);
                     xtimer_usleep(1000); // wait .001 seconds
                 }
@@ -359,21 +435,22 @@ void *_udp_server(void *args)
         } else if (strcmp(MY_TOPO,"line") == 0) {
             if (DEBUG == 1)
                 printf("UDP: generating line topology\n");
+            printf("node, neighborID, neighbors\n");
             int j;
-            for (j = 0; j < 2; j++) { // send topology info 2 time(s)
+            for (j = 0; j < 3; j++) { // send topology info 3 time(s)
                 for (i = 0; i < numNodes; i++) {
                     memset(msg, 0, SERVER_BUFFER_SIZE);
 
                     int pre = (i-1);
                     int post = (i+1);
 
-                    if (j == 0 && DEBUG == 1) {
+                    if (j == 0) {
                         if (pre == -1)
-                            printf("UDP: node %d [%s]'s neighbor is %d\n", i, nodes[i], post);
+                            printf("%s, %d, %d\n", nodes[i], i, post);
                         else if (post == numNodes) 
-                            printf("UDP: node %d [%s]'s neighbor is %d\n", i, nodes[i], pre);
+                            printf("%s, %d, %d\n", nodes[i], i, pre);
                         else
-                            printf("UDP: node %d [%s]'s neighbors are %d and %d\n", i, nodes[i], pre, post);
+                            printf("%s, %d, %d %d\n", nodes[i], i, pre, post);
                     }
 
                     strcpy(msg, "ips;");
@@ -391,7 +468,11 @@ void *_udp_server(void *args)
                         printf("UDP: Sending node %d's info: %s\n", i, msg);
                     }
 
-                    char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
+                    memset(ipv6, 0, 30);
+                    strcat(ipv6, ipv6_prefix);
+                    strcat(ipv6, nodes[i]);
+
+                    char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
                     udp_send(4, argsMsg);
                     xtimer_usleep(1000); // wait .001 seconds
                 }
@@ -409,6 +490,7 @@ void *_udp_server(void *args)
         } else if (strcmp(MY_TOPO,"tree") == 0) {
             if (DEBUG == 1)
                 printf("UDP: generating tree topology\n");
+            printf("node, neighborID, neighbors\n");
             int depth = (int)logk(numNodes,2);
             if (DEBUG == 1)
                 printf("UDP: numNodes=%d, depth=%d\n\n", numNodes, depth);
@@ -421,22 +503,22 @@ void *_udp_server(void *args)
                     int left = (i*2)+1;
                     int right = (i*2)+2;
 
-                    if (j == 0 && DEBUG == 1) {
+                    if (j == 0) {
                         if (i == 0) { //root
                             if (right < numNodes) //2 children
-                                printf("UDP: node %d [%s] (root)'s neighbors are %d and %d\n", i, nodes[i], left, right);
+                                printf("%s, %d, %d %d\n", nodes[i], i, left, right);
                             else if (left < numNodes) //1 child
-                                printf("UDP: node %d [%s] (root)'s neighbor is %d\n", i, nodes[i], left);
+                                printf("%s, %d, %d\n", nodes[i], i, left);
                             else //no chlidren
-                                printf("UDP: node %d [%s] (root) has no neighbors\n", i, nodes[i]);
+                                printf("%s, %d, -\n", nodes[i], i);
                         }
                         else { //not root
                             if (right < numNodes) //2 children
-                                printf("UDP: node %d [%s]'s neighbors are %d, %d, and %d\n", i, nodes[i], parent, left, right);
+                                printf("%s, %d, %d %d %d\n", nodes[i], i, parent, left, right);
                             else if (left < numNodes) //1 child
-                                printf("UDP: node %d [%s]'s neighbors are %d and %d\n", i, nodes[i], parent, left);
+                                printf("%s, %d, %d %d\n", nodes[i], i, parent, left);
                             else //no children
-                                printf("UDP: node %d [%s]'s neighbor is %d\n", i, nodes[i], parent);
+                                printf("%s, %d, %d\n", nodes[i], i, parent);
                         }
                     }
 
@@ -459,19 +541,137 @@ void *_udp_server(void *args)
                         printf("UDP: Sending node %d's info: %s\n", i, msg);
                     }
 
-                    char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
+                    memset(ipv6, 0, 30);
+                    strcat(ipv6, ipv6_prefix);
+                    strcat(ipv6, nodes[i]);
+
+                    char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
                     udp_send(4, argsMsg);
                     xtimer_usleep(1000); // wait .001 seconds
                 }
                 xtimer_usleep(500000); // wait 0.5 seconds
             }
 
+        } else if (strcmp(MY_TOPO,"gen") == 0) {
+            printf("UDP: discovering general topology\n");
+
+            /*
+            for (i = 0; i < numNodes; i++) {
+                memset(msg, 0, SERVER_BUFFER_SIZE);
+                strcpy(msg, "ipsd;");
+
+                memset(ipv6, 0, 30);
+                strcat(ipv6, ipv6_prefix);
+                strcat(ipv6, nodes[i]);
+                        
+                int j = 0;
+                for (j = 0; j < numNodes; j++) {
+                    if (i != j) {
+                        strcat(msg, nodes[j]);
+                        strcat(msg, ";");
+                    }
+                }
+                char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
+                udp_send(4, argsMsg);
+                xtimer_usleep(10000); // wait .01 seconds
+            }*/
+
+            for (i = 0; i < numNodes; i++) {
+                memset(msg, 0, SERVER_BUFFER_SIZE);
+                strcpy(msg, "discover;");
+
+                memset(ipv6, 0, 30);
+                strcat(ipv6, ipv6_prefix);
+                strcat(ipv6, nodes[i]);
+
+                char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
+                udp_send(4, argsMsg);
+                xtimer_usleep(10000); // wait .01 seconds
+            }
+
+            xtimer_usleep(resetDiscoverLoops * wait); // wait resetDiscoverLoops * wait seconds
+    
         } else if (strcmp(MY_TOPO,"grid") == 0) {
             printf("UDP: generating grid topology\n");
             return NULL;
         } else if (strcmp(MY_TOPO,"mesh") == 0) {
-            printf("UDP: generating mesh topology\n");
-            return NULL;
+            if (DEBUG == 1) {
+                printf("UDP: generating mesh topology\n");
+            }
+            printf("node, neighborID, neighbors\n");
+            int width = round(sqrt(numNodes));
+            int height = ceil(sqrt(numNodes));
+            if (DEBUG == 1) {
+                printf("UDP: numNodes=%d, width=%d, height=%d\n", numNodes, width, height);
+            }
+            int j;
+            int neighborGroup[5] = {0};
+            int groupCount = 0;
+            int north = -1;
+            int east = -1;
+            int south = -1;
+            int west = -1;
+            for (j = 0; j < 1; j++) {
+                for (i = 0; i < numNodes; i++) {
+                    memset(msg, 0, SERVER_BUFFER_SIZE);
+
+                    groupCount = 0;
+                    if (i >= width) {
+                        north = i - width;
+                        neighborGroup[groupCount] = north;
+                        groupCount += 1;
+                    }
+                    if (i % width != 0) {
+                        west = i - 1;
+                        neighborGroup[groupCount] = west;
+                        groupCount += 1;
+                    }
+                    if (i % width != width - 1 && i + 1 < numNodes) {
+                        east = i + 1;
+                        neighborGroup[groupCount] = east;
+                        groupCount += 1;
+                    }
+                    if (i + width < numNodes) {
+                        south = i + width;
+                        neighborGroup[groupCount] = south;
+                        groupCount += 1;
+                    }
+
+                    if (j == 0) {
+                        if (groupCount == 1) // 1 neighbor
+                            printf("%s, %d, %d\n", nodes[i], i, neighborGroup[0]);
+                        else if (groupCount == 2) // 2 neighbors
+                            printf("%s, %d, %d %d\n", nodes[i], i, neighborGroup[0], neighborGroup[1]);
+                        else if (groupCount == 3) // 3 neighbors
+                            printf("%s, %d, %d %d %d\n", nodes[i], i, neighborGroup[0], neighborGroup[1], neighborGroup[2]);
+                        else if (groupCount == 4) // 4 neighbors
+                            printf("%s, %d, %d %d %d %d\n", nodes[i], i, neighborGroup[0], neighborGroup[1], neighborGroup[2], neighborGroup[3]);
+                        else // no neighbors, shouldn't happen
+                            printf("%s, %d,\n", nodes[i], i);
+                    }
+
+                    strcpy(msg, "ips;");
+
+                    int g;
+                    for (g = 0; g < groupCount; g++) {
+                        strcat(msg, nodes[neighborGroup[g]]);
+                        strcat(msg, ";");
+                    }
+
+                    if (j == 0 && DEBUG == 1) {
+                        printf("UDP: Sending node %d's info: %s\n", i, msg);
+                    }
+
+                    memset(ipv6, 0, 30);
+                    strcat(ipv6, ipv6_prefix);
+                    strcat(ipv6, nodes[i]);
+
+                    char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
+                    udp_send(4, argsMsg);
+                    xtimer_usleep(5000); // wait .005 seconds
+                }
+                xtimer_usleep(500000); // wait 0.5 seconds
+            }
         }
 
         // synchronization? tell nodes to go?
@@ -481,17 +681,30 @@ void *_udp_server(void *args)
 
         int j;
         for (j = 0; j < 2; j++) {
+
+            /*
             for (i = 0; i < numNodes; i++) {
                 strcpy(msg, "start;");
-                char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
+
+                memset(ipv6, 0, 30);
+                strcat(ipv6, ipv6_prefix);
+                strcat(ipv6, nodes[i]);
+
+                char *argsMsg[] = { "udp_send", ipv6, portBuf, msg, NULL };
                 udp_send(4, argsMsg);
-                xtimer_usleep(2000); // wait .002 seconds
+                xtimer_usleep(100); // wait .0001 seconds
             }
+            */
+
+            strcpy(msg, "start;");
+            char *argsMsg[] = { "udp_send_multi", portBuf, msg, NULL };
+            udp_send_multi(3, argsMsg);
+            xtimer_usleep(100); // wait .0001 seconds
         }
 
-        if (DEBUG == 1) {
-            printf("UDP: start messages sent\n");
-        }
+        //if (DEBUG == 1) {
+            //printf("UDP: start messages sent\n");
+        //}
 
         // termination loop, waiting for info on protocol termination
         while (1) {
@@ -500,9 +713,10 @@ void *_udp_server(void *args)
             memset(msg, 0, SERVER_BUFFER_SIZE);
             memset(msgP, 0, SERVER_BUFFER_SIZE);
             memset(server_buffer, 0, SERVER_BUFFER_SIZE);
+            memset(ipv6, 0, 30);
 
             if ((res = sock_udp_recv(&sock, server_buffer,
-                                     sizeof(server_buffer) - 1, 0.03 * US_PER_SEC, //SOCK_NO_TIMEOUT,
+                                     sizeof(server_buffer) - 1, 0.005 * US_PER_SEC, //SOCK_NO_TIMEOUT,
                                      &remote)) < 0) {
                 if(res != 0 && res != -ETIMEDOUT && res != -EAGAIN && DEBUG == 1)  {
                     printf("UDP: Error - failed to receive UDP, %d\n", res);
@@ -515,7 +729,13 @@ void *_udp_server(void *args)
             else {
                 server_buffer[res] = '\0';
                 res = 1;
-                ipv6_addr_to_str(ipv6, (ipv6_addr_t *)&remote.addr.ipv6, IPV6_ADDRESS_LEN);
+                ipv6_addr_to_str(ipv6, (ipv6_addr_t *)&remote.addr.ipv6, 47);
+
+                int len = strlen(ipv6)-6;
+                memset(ipv6_unique, 0, IPV6_ADDRESS_LEN);
+                strncpy(ipv6_unique, ipv6+6, len);
+                ipv6_unique[len] = '\0';
+
                 if (DEBUG == 1) {
                     printf("UDP: recvd: %s from %s\n", server_buffer, ipv6);
                 }
@@ -528,6 +748,11 @@ void *_udp_server(void *args)
                     printf("ERROR: protocol failed by node %s\n", ipv6);
                     for (i = 0; i < numNodes; i++) {
                         strcpy(msg, "failure;");
+
+                        memset(ipv6, 0, 30);
+                        strcat(ipv6, ipv6_prefix);
+                        strcat(ipv6, nodes[i]);
+
                         char *argsMsg[] = { "udp_send", nodes[i], portBuf, msg, NULL };
                         udp_send(4, argsMsg);
                         xtimer_usleep(1000); // wait .001 seconds
@@ -540,19 +765,18 @@ void *_udp_server(void *args)
                     if (!finished) {
                         int correct = -1;
 
-                        char *argsMsg[] = { "udp_send", ipv6, portBuf, rconf, NULL };
-                        udp_send(4, argsMsg);
-
                         if (numNodesFinished == 0) {
-                            printf("\nnode,m,elected,correct,startTime,runTime,messages\n");
+                            printf("node,m,elected,correct,startTime,runTime,messages\n");
                             resBegin = xtimer_now_usec();
                         }
 
-                        int index = getNeighborIndex(nodes,ipv6);
-                        if (confirmed[index] == 1 && DEBUG == 1) {
-                            printf("UDP: node %s was already confirmed\n", ipv6);
+                        int index = getNeighborIndex(nodes,ipv6_unique);
+                        if (confirmed[index] == 1) {
+                            if (DEBUG == 1)
+                                printf("UDP: node %s was already confirmed\n", ipv6_unique);
                             continue;
                         }
+                        confirmed[index] = 1; // results confirmed
 
                         // extract data
                         strcpy(msg, server_buffer);
@@ -572,10 +796,19 @@ void *_udp_server(void *args)
 
                         memset(tempunixtime, 0, 15);
                         memset(tempunixsec, 0, 15);
+                        memset(tempdegree, 0, 15);
 
                         extractMsgSegment(&mem, tempunixsec);
                         extractMsgSegment(&mem, tempmessagecount); // Extract the message count
+                        extractMsgSegment(&mem, tempdegree); // degree
                         //printf("UDP: Node %s exchanged %s messages\n",ipv6,tempmessagecount);
+
+                        float tempRun = atof(tempunixsec);
+                        if (tempRun > maxRun) {
+                            maxRun = tempRun;
+                            memset(temprunsec, 0, 15);
+                            strncpy(temprunsec, tempunixsec, 15);
+                        }
 
                         int msgs = atoi(tempmessagecount);
                         if (minMsgs == 0 || msgs < minMsgs)
@@ -583,6 +816,8 @@ void *_udp_server(void *args)
                         if (maxMsgs == 0 || msgs > maxMsgs)
                             maxMsgs = msgs;
                         sumMsgs += msgs;
+
+                        int degree = atoi(tempdegree);
 
                         // offset unix time
                         uint32_t offValue = startTime - syncTime;
@@ -612,36 +847,59 @@ void *_udp_server(void *args)
                             sprintf(tempunixtime, "%"PRIu32, unixTime);
                         }
 
-                        printf("%s,%d,%s,%s,%s,%s,%s\n", ipv6, m_values[index], tempipv6, correct ? "yes" : "no", tempunixtime, tempunixsec, tempmessagecount);
+                        printf("%s,%d,%s,%s,%s,%s,%s,%d\n", ipv6_unique, m_values[index], tempipv6, correct ? "yes" : "no", tempunixtime, tempunixsec, tempmessagecount, degree);
 
-                        confirmed[index] = 1; // results confirmed
                         numNodesFinished++;
+
+                        char *argsMsg[] = { "udp_send", ipv6, portBuf, rconf, NULL };
+                        udp_send(4, argsMsg);
 
                         //printf("UDP: %d nodes reported so far\n",numNodesFinished);
                         if (numNodesFinished >= numNodes) {
+                            //printf("In finish block\n");
                             if (DEBUG == 1)
                                 printf("Correct: %s\n", correctNodes == numNodesFinished ? "yes" : "no");
                             //printf("AvgTime: %d/%d sec\n", sumTime, numNodesFinished);
                             //printf("AvgMsgs: %d/%d msgs\n", sumMsgs, numNodesFinished);
 
-                            if (DEBUG == 1)
-                                printf("\nUDP: All nodes have reported!\n");
+                            printf("\nUDP: All nodes have reported!\n");
                             finished = 1;
+                            //printf("Before finish block break statement\n");
                             break; // terminate
                         }
                     }
                 }
             }
-
-            if (resBegin > 0 && xtimer_now_usec() - resBegin >= 30000000) {
+            
+            uint32_t timeout = (uint32_t)((numNodes+1)/2);
+            if (timeout < 20) timeout = 20;
+            if (resBegin > 0 && xtimer_now_usec() - resBegin >= timeout * 1000000) {
                 // 20 sec trying to get results...
-                printf("ERROR: didn't get results from all nodes within 30 seconds\n");
+                printf("ERROR: didn't get results from all nodes within %"PRIu32" seconds\n", timeout);
                 finished = 1;
                 break;
             }
 
-            xtimer_usleep(30000); // wait 0.03 seconds
+            //xtimer_usleep(5000); // wait 0.005 seconds
         }
+        //printf("After experiment loop\n");
+
+        if (correctNodes == numNodesFinished) {
+            //experiment was correct
+            //printf("Recording runtimes\n");
+            strncpy(expRuns[numCorrect], temprunsec, 15);
+            //printf("Recording starts\n");
+            strncpy(expStarts[numCorrect], tempunixtime, 15);
+            //printf("Incrementing numCorrect\n");
+            numCorrect += 1;
+            printf("\n");
+        } else {
+            printf("********ABOVE EXPERIMENT FAILED********\n\n");
+        }
+        //printf("Resetting all vars\n");
+        
+        memset(tempunixtime, 0, 15);
+        memset(temprunsec, 0, 15);
 
         // reset variables
         for(i = 0; i < MAX_NODES; i++) {
@@ -662,15 +920,42 @@ void *_udp_server(void *args)
         sumMsgs = 0;
         min = 257;
         minIndex = -1;
+        maxRun = 0.0;
 
         lastDiscover = 0;
         discoverLoops = resetDiscoverLoops;
+
+        int z = 20;
+        while (z > 0) {
+            //printf("clearing queue");
+            sock_udp_recv(&sock, server_buffer,
+                 SERVER_BUFFER_SIZE - 1, 0, //SOCK_NO_TIMEOUT,
+                 &remote);
+            z -= 1;
+        }
 
         if (DEBUG == 1)
             printf("Variables reset, starting next experiment in 5 seconds\n");
         
         xtimer_usleep(5000000); // wait 5 seconds
         expNum++;
+    }
+
+    // output run info for power processing script
+    printf("\n%d/%d correct experiment results:\n", numCorrect, expNum);
+    for(i = 0; i < numCorrect; i++) {
+        if (i == numCorrect-1) {
+            printf("%s\n", expStarts[i]);
+        } else {
+            printf("%s,", expStarts[i]);
+        }
+    }
+    for(i = 0; i < numCorrect; i++) {
+        if (i == numCorrect-1) {
+            printf("%s\n", expRuns[i]);
+        } else {
+            printf("%s,", expRuns[i]);
+        }
     }
 
     for(i = 0; i < MAX_NODES; i++) {

@@ -59,6 +59,8 @@ echo ""
 ./collect_binary.sh $BOARD master line
 ./collect_binary.sh $BOARD master ring
 ./collect_binary.sh $BOARD master tree
+./collect_binary.sh $BOARD master gen
+./collect_binary.sh $BOARD master mesh
 echo ""
 echo "Master node generation complete."
 echo ""
