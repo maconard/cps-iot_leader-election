@@ -6,6 +6,8 @@ This project uses one master node to discover all the worker nodes. The master n
 
 To test on N nodes, you should create an experiment with N+1 nodes. Flash the master firmware to one node and the worker firmware to the other N nodes.
 
+Note that this version of the code uses the Master Node concept only as a means of experimentation and data collection; the algorithm can be deployed without a master node where any node can initiate an election instead of just the master.
+
 # Usage
 
 You can compile binaries in mass using the `binaries/generate_binaries.sh` script. It will produce a master binary for every topology as well as the requested worker binaries. 
