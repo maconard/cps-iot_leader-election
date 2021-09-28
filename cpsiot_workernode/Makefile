@@ -26,7 +26,7 @@ USEMODULE += gnrc_txtsnd
 USEMODULE += gnrc_icmpv6_error
 # Specify the mandatory networking modules for IPv6 and UDP
 USEMODULE += gnrc_ipv6_default
-USEMODULE += gnrc_ipv6_router_default
+#USEMODULE += gnrc_ipv6_router_default
 USEMODULE += gnrc_udp
 USEMODULE += gnrc_sock_udp
 # Add a routing protocol
@@ -62,7 +62,7 @@ QUIET ?= 1
 #STDIO_DEV = UART_DEV\(1\)
 #CFLAGS += -DSTDIO_UART_DEV=$(STDIO_DEV)
 
-CFLAGS += -DGNRC_PKTBUF_SIZE=512
+CFLAGS += -DGNRC_PKTBUF_SIZE=528
 CFLAGS += -DGNRC_IPV6_NC_SIZE=0
 
 FEATURES_OPTIONAL += periph_rtc

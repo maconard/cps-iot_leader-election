@@ -25,9 +25,9 @@
 // Size definitions
 #define CHANNEL                 11
 #define SERVER_MSG_QUEUE_SIZE   (32)
-#define SERVER_BUFFER_SIZE      (256)
+#define SERVER_BUFFER_SIZE      (128)
 #define IPV6_ADDRESS_LEN        (22)
-#define MAX_NEIGHBORS           (69)
+#define MAX_NEIGHBORS           (40)
 
 #define DEBUG       (1)
 
